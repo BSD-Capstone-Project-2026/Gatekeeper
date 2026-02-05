@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Users - Secure Access Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar (same as dashboard) -->
+        <div class="col-md-2 sidebar p-0">
+            <div class="p-3">
+                <h4 class="text-center mb-4">🏢 Management</h4>
+                <hr>
+                <a href="{{ url_for('web.dashboard') }}">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+                <a href="{{ url_for('web.users_list') }}" class="active">
+                    <i class="bi bi-people"></i> Users
+                </a>
+                <a href="{{ url_for('web.create_user') }}">
+                    <i class="bi bi-person-plus"></i> Create User
+                </a>
+                <hr>
+                <a href="{{ url_for('web.logout') }}" class="text-warning">
+                    <i class="bi bi-box-arrow-left"></i> Logout
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-10 p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-people"></i> User Management</h2>
+                <a href="{{ url_for('web.create_user') }}" class="btn btn-primary">
+                    <i class="bi bi-person-plus"></i> Add New User
+                </a>
+            </div>
+
+            <!-- User Table -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.id }}</td>
+                                    <td><strong>{{ user.username }}</strong></td>
+                                    <td>{{ user.first_name }} {{ user.last_name }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        <span class="badge {% if user.role == 'management' %}bg-danger{% elif user.role == 'concierge' %}bg-warning{% else %}bg-info{% endif %}">
+                                            {{ user.role|title }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if user.is_locked %}
+                                            <span class="badge bg-danger">🔒 Locked</span>
+                                        {% elif not user.is_active %}
+                                            <span class="badge bg-secondary">⏸️ Inactive</span>
+                                        {% else %}
+                                            <span class="badge bg-success">✅ Active</span>
+                                        {% endif %}
+                                        {% if user.failed_login_attempts > 0 %}
+                                            <br><small class="text-muted">Failed: {{ user.failed_login_attempts }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            {% if user.is_locked %}
+                                            <a href="{{ url_for('web.unlock_user', user_id=user.id) }}" 
+                                               class="btn btn-success" title="Unlock Account">
+                                                <i class="bi bi-unlock"></i>
+                                            </a>
+                                            {% else %}
+                                            <a href="{{ url_for('web.toggle_user', user_id=user.id) }}" 
+                                               class="btn btn-warning" 
+                                               title="{{ 'Deactivate' if user.is_active else 'Activate' }}">
+                                                <i class="bi bi-power"></i>
+                                            </a>
+                                            {% endif %}
+                                            <button type="button" class="btn btn-info" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#userModal{{ user.id }}"
+                                                    title="View Details">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- User Detail Modal -->
+                                <div class="modal fade" id="userModal{{ user.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">User Details</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="row mb-3">
+                                                    <div class="col-4"><strong>Username:</strong></div>
+                                                    <div class="col-8">{{ user.username }}</div>
+                                                </div>
+                                                <div class="row mb-3">
+                                                    <div class="col-4"><strong>Name:</strong></div>
+                                                    <div class="col-8">{{ user.first_name }} {{ user.last_name }}</div>
+                                                </div>
+                                                <div class="row mb-3">
+                                                    <div class="col-4"><strong>Email:</strong></div>
+                                                    <div class="col-8">{{ user.email }}</div>
+                                                </div>
+                                                <div class="row mb-3">
+                                                    <div class="col-4"><strong>Role:</strong></div>
+                                                    <div class="col-8">
+                                                        <span class="badge {% if user.role == 'management' %}bg-danger{% elif user.role == 'concierge' %}bg-warning{% else %}bg-info{% endif %}">
+                                                            {{ user.role|title }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div class="row mb-3">
+                                                    <div class="col-4"><strong>Status:</strong></div>
+                                                    <div class="col-8">
+                                                        {% if user.is_locked %}
+                                                            <span class="badge bg-danger">Locked</span>
+                                                        {% elif not user.is_active %}
+                                                            <span class="badge bg-secondary">Inactive</span>
+                                                        {% else %}
+                                                            <span class="badge bg-success">Active</span>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                {% if user.temporary_password %}
+                                                <div class="row mb-3">
+                                                    <div class="col-4"><strong>Temp Password:</strong></div>
+                                                    <div class="col-8">
+                                                        <code>{{ user.temporary_password }}</code>
+                                                        <small class="text-muted d-block">(Generated on creation)</small>
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+                                                <div class="row">
+                                                    <div class="col-4"><strong>Created:</strong></div>
+                                                    <div class="col-8">{{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else 'N/A' }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                {% if user.is_locked %}
+                                                <a href="{{ url_for('web.unlock_user', user_id=user.id) }}" 
+                                                   class="btn btn-success">Unlock Account</a>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Statistics -->
+                    <div class="row mt-4">
+                        <div class="col-md-3">
+                            <div class="card text-white bg-primary">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Total Users</h5>
+                                    <p class="card-text display-6">{{ users|length }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-success">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Active Users</h5>
+                                    <p class="card-text display-6">{{ users|selectattr('is_active')|list|length }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-danger">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Locked Users</h5>
+                                    <p class="card-text display-6">{{ users|selectattr('is_locked')|list|length }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-info">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Concierge Staff</h5>
+                                    <p class="card-text display-6">{{ users|selectattr('role', 'equalto', 'concierge')|list|length }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

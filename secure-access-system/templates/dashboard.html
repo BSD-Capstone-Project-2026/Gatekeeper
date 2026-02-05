@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Secure Access Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-2 sidebar p-0">
+            <div class="p-3">
+                <h4 class="text-center mb-4">🏢 Management</h4>
+                <hr>
+                <a href="{{ url_for('web.dashboard') }}" class="active">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+                <a href="{{ url_for('web.users_list') }}">
+                    <i class="bi bi-people"></i> Users
+                </a>
+                <a href="{{ url_for('web.create_user') }}">
+                    <i class="bi bi-person-plus"></i> Create User
+                </a>
+                <hr>
+                <a href="{{ url_for('web.logout') }}" class="text-warning">
+                    <i class="bi bi-box-arrow-left"></i> Logout
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-10 p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
+                <span class="badge bg-primary">{{ current_user.username|default('Admin') }}</span>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card stat-card bg-primary text-white">
+                        <div class="card-body">
+                            <h1 class="display-6">{{ total_users }}</h1>
+                            <p class="mb-0">Total Users</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card stat-card bg-success text-white">
+                        <div class="card-body">
+                            <h1 class="display-6">{{ active_users }}</h1>
+                            <p class="mb-0">Active Users</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card stat-card bg-warning text-white">
+                        <div class="card-body">
+                            <h1 class="display-6">{{ locked_users }}</h1>
+                            <p class="mb-0">Locked Users</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card stat-card bg-info text-white">
+                        <div class="card-body">
+                            <h1 class="display-6">{{ recent_users }}</h1>
+                            <p class="mb-0">New Users (7d)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row g-4">
+                <!-- Role Distribution Chart -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">User Distribution by Role</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="roleChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group">
+                                <a href="{{ url_for('web.create_user') }}" class="list-group-item list-group-item-action">
+                                    <i class="bi bi-person-plus me-2"></i> Create New User
+                                </a>
+                                <a href="{{ url_for('web.users_list') }}" class="list-group-item list-group-item-action">
+                                    <i class="bi bi-unlock me-2"></i> View Locked Users
+                                </a>
+                                <a href="{{ url_for('web.users_list') }}" class="list-group-item list-group-item-action">
+                                    <i class="bi bi-download me-2"></i> Export User List
+                                </a>
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <i class="bi bi-shield-check me-2"></i> System Status: <span class="badge bg-success">Operational</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Users Table -->
+            <div class="card mt-4">
+                <div class="card-header d-flex justify-content-between">
+                    <h5 class="mb-0">Recent User Activity</h5>
+                    <a href="{{ url_for('web.users_list') }}" class="btn btn-sm btn-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users[-5:] %}
+                                <tr>
+                                    <td>{{ user.username }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        <span class="badge {% if user.role == 'management' %}bg-danger{% elif user.role == 'concierge' %}bg-warning{% else %}bg-info{% endif %}">
+                                            {{ user.role|title }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if user.is_locked %}
+                                            <span class="badge bg-danger">Locked</span>
+                                        {% elif not user.is_active %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fetch dashboard statistics
+    async function fetchDashboardStats() {
+        try {
+            const response = await fetch('/api/dashboard/stats');
+            const data = await response.json();
+            
+            // Update stats cards
+            document.getElementById('totalUsers').textContent = data.total_users;
+            document.getElementById('activeUsers').textContent = data.active_users;
+            document.getElementById('lockedUsers').textContent = data.locked_users;
+            document.getElementById('recentUsers').textContent = data.recent_users;
+            
+            // Update chart data
+            const roleCtx = document.getElementById('roleChart').getContext('2d');
+            const roleChart = new Chart(roleCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Management', 'Concierge', 'Resident'],
+                    datasets: [{
+                        data: [
+                            data.management_count,
+                            data.concierge_count,
+                            data.resident_count
+                        ],
+                        backgroundColor: [
+                            '#dc3545', // Red for management
+                            '#ffc107', // Yellow for concierge
+                            '#0dcaf0'  // Blue for resident
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error fetching dashboard stats:', error);
+        }
+    }
+
+    // Fetch recent users
+    async function fetchRecentUsers() {
+        try {
+            const response = await fetch('/api/dashboard/recent-users');
+            const data = await response.json();
+            
+            const tableBody = document.querySelector('#recentUsersTable tbody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            
+            data.users.forEach(user => {
+                const row = document.createElement('tr');
+                
+                // Get badge color based on role
+                let roleBadgeClass = 'bg-info';
+                if (user.role === 'management') roleBadgeClass = 'bg-danger';
+                if (user.role === 'concierge') roleBadgeClass = 'bg-warning';
+                
+                // Get badge color based on status
+                let statusBadgeClass = 'bg-success';
+                if (user.status === 'locked') statusBadgeClass = 'bg-danger';
+                if (user.status === 'inactive') statusBadgeClass = 'bg-secondary';
+                
+                row.innerHTML = `
+                    <td>${user.username}</td>
+                    <td>${user.email}</td>
+                    <td><span class="badge ${roleBadgeClass}">${user.role}</span></td>
+                    <td><span class="badge ${statusBadgeClass}">${user.status}</span></td>
+                    <td>${user.created}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        } catch (error) {
+            console.error('Error fetching recent users:', error);
+        }
+    }
+
+    // Load all data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchDashboardStats();
+        fetchRecentUsers();
+        
+        // Refresh data every 30 seconds
+        setInterval(() => {
+            fetchDashboardStats();
+            fetchRecentUsers();
+        }, 30000);
+    });
+</script>
+{% endblock %}
