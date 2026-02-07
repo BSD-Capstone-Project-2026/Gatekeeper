@@ -6,25 +6,38 @@
 <div class="container-fluid">
     <div class="row">
         <!-- Sidebar -->
-        <div class="col-md-2 sidebar p-0">
-            <div class="p-3">
-                <h4 class="text-center mb-4">🏢 Management</h4>
-                <hr>
-                <a href="{{ url_for('web.dashboard') }}" class="active">
-                    <i class="bi bi-speedometer2"></i> Dashboard
-                </a>
-                <a href="{{ url_for('web.users_list') }}">
-                    <i class="bi bi-people"></i> Users
-                </a>
-                <a href="{{ url_for('web.create_user') }}">
-                    <i class="bi bi-person-plus"></i> Create User
-                </a>
-                <hr>
-                <a href="{{ url_for('web.logout') }}" class="text-warning">
-                    <i class="bi bi-box-arrow-left"></i> Logout
-                </a>
-            </div>
-        </div>
+        <!-- In dashboard.html - Update sidebar section -->
+<div class="col-md-2 sidebar p-0">
+    <div class="p-3">
+        <h4 class="text-center mb-4">🏢 {{ user_role|title }}</h4>
+        <hr>
+        <a href="{{ url_for('web.dashboard') }}" class="active">
+            <i class="bi bi-speedometer2"></i> Dashboard
+        </a>
+        
+        <!-- Show Users and Create User only for management/concierge -->
+        {% if user_role in ['management', 'concierge'] %}
+        <a href="{{ url_for('web.users_list') }}">
+            <i class="bi bi-people"></i> Users
+        </a>
+        <a href="{{ url_for('web.create_user') }}">
+            <i class="bi bi-person-plus"></i> Create User
+        </a>
+        {% endif %}
+        
+        <!-- Show for ALL logged-in users -->
+        <a href="{{ url_for('web.profile') }}">
+            <i class="bi bi-person-circle"></i> My Profile
+        </a>
+        <a href="{{ url_for('web.reset_password') }}">
+            <i class="bi bi-key"></i> Reset Password
+        </a>
+        <hr>
+        <a href="{{ url_for('web.logout') }}" class="text-warning">
+            <i class="bi bi-box-arrow-left"></i> Logout
+        </a>
+    </div>
+</div>
 
         <!-- Main Content -->
         <div class="col-md-10 p-4">

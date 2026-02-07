@@ -9,12 +9,18 @@ from routes.auth import auth_bp
 from routes.users import users_bp
 from routes.protected import protected_bp
 from routes.web import web_bp 
+from routes.dashboard import dashboard_bp
+
 
 from flask_login import LoginManager
 
 def create_app():
     app = Flask(__name__, template_folder='templates')
     app.config.from_object(Config)
+    app.register_blueprint(dashboard_bp)
+
+    
+
 
     # Initialize extensions
     db.init_app(app)
@@ -27,6 +33,7 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
+        
         return User.query.get(int(user_id))
     # ------------------------
 
@@ -38,9 +45,9 @@ def create_app():
 
     # Create tables + seed demo management user
     with app.app_context():
-        if app.config.get('RESET_DB'):
-            print("🔄 Resetting database...")
-            db.drop_all()
+       # if app.config.get('RESET_DB'):
+        #    print("🔄 Resetting database...")
+         #   db.drop_all()
         
         db.create_all()
 

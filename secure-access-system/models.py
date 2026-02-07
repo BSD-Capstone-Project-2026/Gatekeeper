@@ -17,6 +17,7 @@ class User(db.Model, UserMixin):  # <-- Inherit from UserMixin
     password_hash = db.Column(db.String(255), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
     
     # Login security fields
     failed_login_attempts = db.Column(db.Integer, default=0)

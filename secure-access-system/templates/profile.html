@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile - Secure Access System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-2 sidebar p-0">
+            <div class="p-3">
+                <h5 class="text-center mb-4">{{ user.role|title }}</h5>
+                <hr>
+                <a href="{{ url_for('web.dashboard') }}">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+                <a href="{{ url_for('web.profile') }}" class="active">
+                    <i class="bi bi-person-circle"></i> My Profile
+                </a>
+                <a href="{{ url_for('web.reset_password') }}">
+                    <i class="bi bi-key"></i> Reset Password
+                </a>
+                <hr>
+                <a href="{{ url_for('web.logout') }}" class="text-warning">
+                    <i class="bi bi-box-arrow-left"></i> Logout
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-10 p-4">
+            <h2 class="mb-4"><i class="bi bi-person-circle"></i> My Profile</h2>
+            
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Personal Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4"><strong>Username:</strong></div>
+                                <div class="col-md-8">
+                                    <code>{{ user.username }}</code>
+                                    <small class="text-muted d-block">(System generated)</small>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-4"><strong>Full Name:</strong></div>
+                                <div class="col-md-8">{{ user.first_name }} {{ user.last_name }}</div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-4"><strong>Email:</strong></div>
+                                <div class="col-md-8">{{ user.email }}</div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-4"><strong>Role:</strong></div>
+                                <div class="col-md-8">
+                                    <span class="badge {% if user.role == 'management' %}bg-danger{% elif user.role == 'concierge' %}bg-warning{% else %}bg-info{% endif %}">
+                                        {{ user.role|title }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-4"><strong>Account Status:</strong></div>
+                                <div class="col-md-8">
+                                    {% if user.is_locked %}
+                                        <span class="badge bg-danger">🔒 Locked</span>
+                                    {% elif not user.is_active %}
+                                        <span class="badge bg-secondary">⏸️ Inactive</span>
+                                    {% else %}
+                                        <span class="badge bg-success">✅ Active</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4"><strong>Member Since:</strong></div>
+                                <div class="col-md-8">
+                                    {{ user.created_at.strftime('%B %d, %Y') if user.created_at else 'N/A' }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group">
+                                <a href="{{ url_for('web.reset_password') }}" class="list-group-item list-group-item-action">
+                                    <i class="bi bi-key me-2"></i> Change Password
+                                </a>
+                                
+                                {% if user.role == 'resident' %}
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <i class="bi bi-house-door me-2"></i> My Unit Access
+                                </a>
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <i class="bi bi-clock-history me-2"></i> Access History
+                                </a>
+                                {% endif %}
+                                
+                                {% if user.role == 'concierge' %}
+                                <a href="{{ url_for('web.create_user') }}" class="list-group-item list-group-item-action">
+                                    <i class="bi bi-person-plus me-2"></i> Add New Resident
+                                </a>
+                                <a href="{{ url_for('web.users_list') }}" class="list-group-item list-group-item-action">
+                                    <i class="bi bi-people me-2"></i> View Residents
+                                </a>
+                                {% endif %}
+                                
+                                {% if user.role == 'management' %}
+                                <a href="{{ url_for('web.create_user') }}" class="list-group-item list-group-item-action">
+                                    <i class="bi bi-person-plus me-2"></i> Add User
+                                </a>
+                                <a href="{{ url_for('web.users_list') }}" class="list-group-item list-group-item-action">
+                                    <i class="bi bi-people me-2"></i> Manage Users
+                                </a>
+                                <a href="{{ url_for('web.reset_password') }}">
+                                     <i class="bi bi-key"></i> Reset Password
+                                </a>
+                                <a href="{{ url_for('web.reset_password') }}" class="btn btn-primary">
+                                     <i class="bi bi-key"></i> Change Password
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
