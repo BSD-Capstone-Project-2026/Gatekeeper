@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Assign Zones to {{ user.username }}{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-2 sidebar p-0">{% include "_sidebar.html" %}</div>
+        <div class="col-md-10 p-4">
+            <h2>Zones for {{ user.first_name }} {{ user.last_name }} ({{ user.username }})</h2>
+            <form method="POST">
+                {% for zone in zones %}
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="zone_ids" value="{{ zone.id }}" id="zone{{ zone.id }}"
+                        {% if zone in user.zones %}checked{% endif %}>
+                    <label class="form-check-label" for="zone{{ zone.id }}">
+                        {{ zone.name }} – {{ zone.description }}
+                    </label>
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary mt-3">Save</button>
+                <a href="{{ url_for('web.users_list') }}" class="btn btn-secondary mt-3">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

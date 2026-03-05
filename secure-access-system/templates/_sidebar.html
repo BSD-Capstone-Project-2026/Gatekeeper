@@ -1,0 +1,25 @@
+<div class="p-3">
+    <h4 class="text-center mb-4">🏢 {{ session.user_role|title }}</h4>
+    <hr>
+    <a href="{{ url_for('web.dashboard') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+
+    {% if session.user_role in ['management', 'concierge'] %}
+    <a href="{{ url_for('web.users_list') }}"><i class="bi bi-people"></i> Users</a>
+    <a href="{{ url_for('web.create_user') }}"><i class="bi bi-person-plus"></i> Create User</a>
+    {% endif %}
+
+    {% if session.user_role == 'management' %}
+    <a href="{{ url_for('web.list_zones') }}"><i class="bi bi-grid-3x3-gap-fill"></i> Zones</a>
+    <a href="{{ url_for('web.list_doors') }}"><i class="bi bi-door-open"></i> Doors</a>
+    <a href="{{ url_for('web.incidents') }}"><i class="bi bi-exclamation-triangle"></i> Incidents</a>
+    {% endif %}
+
+    {% if session.user_role == 'resident' %}
+    <a href="{{ url_for('web.simulate') }}"><i class="bi bi-door-open"></i> Access Simulation</a>
+    {% endif %}
+
+    <a href="{{ url_for('web.profile') }}"><i class="bi bi-person-circle"></i> Profile</a>
+    <a href="{{ url_for('web.reset_password') }}"><i class="bi bi-key"></i> Reset Password</a>
+    <hr>
+    <a href="{{ url_for('web.logout') }}" class="text-warning"><i class="bi bi-box-arrow-left"></i> Logout</a>
+</div>

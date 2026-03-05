@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if zone else 'Create' }} Zone{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-2 sidebar p-0">{% include "_sidebar.html" %}</div>
+        <div class="col-md-10 p-4">
+            <h2>{{ 'Edit' if zone else 'Create' }} Zone</h2>
+            {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+            <form method="POST">
+                <div class="mb-3">
+                    <label>Name</label>
+                    <input type="text" name="name" class="form-control" value="{{ zone.name if zone else '' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label>Description</label>
+                    <textarea name="description" class="form-control">{{ zone.description if zone else '' }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+                <a href="{{ url_for('web.list_zones') }}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -31,4 +31,4 @@ class Config:
     DEMO_USER_PASSWORD = "DemoPass123"
 
     # Database reset flag (development only)
-    RESET_DB = True  # Set to False once database is stable
+    RESET_DB = False  # Set to False once database is stable

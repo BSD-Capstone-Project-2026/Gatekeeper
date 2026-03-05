@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Access Simulation{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mt-4">🏢 Access Simulation – Unit {{ unit }} (Floor {{ floor }})</h2>
+    
+    <div class="row mt-5">
+        <!-- Main Entrance Door -->
+        <div class="col-md-4 text-center">
+            <div class="card p-3">
+                <div class="display-1">🚪</div>
+                <h4>Main Entrance</h4>
+                <div id="main-door-status" class="badge bg-danger p-2 mt-2">🔒 CLOSED</div>
+            </div>
+        </div>
+        
+        <!-- Elevator -->
+        <div class="col-md-4 text-center">
+            <div class="card p-3">
+                <div class="display-1">🛗</div>
+                <h4>Elevator</h4>
+                <div>Current floor: <span id="elevator-current">1</span></div>
+                <div>Target: <span id="elevator-target">{{ floor }}</span></div>
+                <div id="elevator-status" class="badge bg-secondary mt-2">⏳ Idle</div>
+            </div>
+        </div>
+        
+        <!-- Unit Door -->
+        <div class="col-md-4 text-center">
+            <div class="card p-3">
+                <div class="display-1">🚪</div>
+                <h4>Your Unit Door</h4>
+                <div id="unit-door-status" class="badge bg-danger p-2 mt-2">🔒 CLOSED</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col text-center">
+            <button class="btn btn-primary btn-lg me-2" onclick="unlockMainDoor()">Unlock Main Door</button>
+            <button class="btn btn-warning btn-lg me-2" onclick="callElevator()">Call Elevator</button>
+            <button class="btn btn-success btn-lg" onclick="unlockUnitDoor()">Unlock Unit Door</button>
+        </div>
+    </div>
+    
+    <!-- Log Panel -->
+    <div class="row mt-5">
+        <div class="col">
+            <div class="card">
+                <div class="card-header">Access Log</div>
+                <div class="card-body" style="max-height: 200px; overflow-y: auto;" id="log-panel">
+                    <p class="text-muted">No events yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript to call APIs and update UI -->
+<script>
+    const jwtToken = "{{ jwt_token }}";
+    const MAIN_DOOR_ID = {{ main_door_id }};
+    const UNIT_DOOR_ID = {{ unit_door_id }};
+    const BUILDING_WIFI = "Avengers-x";   // Consistent SSID
+
+    function log(message, type = 'info') {
+        const logPanel = document.getElementById('log-panel');
+        const entry = document.createElement('p');
+        entry.className = type === 'success' ? 'text-success' : (type === 'error' ? 'text-danger' : '');
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logPanel.appendChild(entry);
+        logPanel.scrollTop = logPanel.scrollHeight;
+    }
+    
+    async function callAPI(endpoint, data) {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${jwtToken}`
+            },
+            body: JSON.stringify(data)
+        });
+        return response;
+    }
+
+    async function unlockMainDoor() {
+        log('Attempting to unlock main door...');
+        const res = await callAPI('/api/access/request', {
+            door_id: MAIN_DOOR_ID,
+            wifi_ssid: BUILDING_WIFI,
+            proximity: true
+        });
+        const data = await res.json();
+        if (res.ok) {
+            document.getElementById('main-door-status').className = 'badge bg-success p-2 mt-2';
+            document.getElementById('main-door-status').innerHTML = '🔓 OPEN';
+            log('✅ Main door opened', 'success');
+        } else {
+            document.getElementById('main-door-status').className = 'badge bg-danger p-2 mt-2';
+            document.getElementById('main-door-status').innerHTML = '🔒 CLOSED';
+            log(`❌ Access denied: ${data.error || 'Unknown error'}`, 'error');
+        }
+    }
+    
+    async function unlockUnitDoor() {
+        log('Attempting to unlock unit door...');
+        const res = await callAPI('/api/access/request', {
+            door_id: UNIT_DOOR_ID,
+            wifi_ssid: BUILDING_WIFI,
+            proximity: true
+        });
+        const data = await res.json();
+        if (res.ok) {
+            document.getElementById('unit-door-status').className = 'badge bg-success p-2 mt-2';
+            document.getElementById('unit-door-status').innerHTML = '🔓 OPEN';
+            log('✅ Unit door opened', 'success');
+        } else {
+            document.getElementById('unit-door-status').className = 'badge bg-danger p-2 mt-2';
+            document.getElementById('unit-door-status').innerHTML = '🔒 CLOSED';
+            log(`❌ Access denied: ${data.error || 'Unknown error'}`, 'error');
+        }
+    }
+    
+    async function callElevator() {
+        log('Calling elevator...');
+        document.getElementById('elevator-status').className = 'badge bg-warning mt-2';
+        document.getElementById('elevator-status').innerHTML = '⏳ Moving';
+        
+        const res = await callAPI('/api/access/elevator/call', {});
+        const data = await res.json();
+        if (res.ok) {
+            // Simulate elevator moving
+            let current = 1;
+            const target = parseInt("{{ floor | default(1) }}");
+            const interval = setInterval(() => {
+                if (current < target) {
+                    current++;
+                    document.getElementById('elevator-current').innerText = current;
+                } else {
+                    clearInterval(interval);
+                    document.getElementById('elevator-status').className = 'badge bg-success mt-2';
+                    document.getElementById('elevator-status').innerHTML = '✅ Arrived';
+                    log(`✅ Elevator arrived at floor ${target}`, 'success');
+                }
+            }, 500);
+        } else {
+            document.getElementById('elevator-status').className = 'badge bg-danger mt-2';
+            document.getElementById('elevator-status').innerHTML = '❌ Failed';
+            log(`❌ Elevator call failed: ${data.error || 'Unknown error'}`, 'error');
+        }
+    }
+</script>
+{% endblock %}

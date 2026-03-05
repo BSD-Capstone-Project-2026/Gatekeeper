@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}My Access History{% endblock %}
+{% block content %}
+<div class="container">
+    <h2>My Access History</h2>
+    {% if logs %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Door</th>
+                <th>Status</th>
+                <th>Reason</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr class="{{ 'table-success' if log.success else 'table-danger' }}">
+                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                <td>{{ log.door_name }}</td>
+                <td>{% if log.success %}Success{% else %}Denied{% endif %}</td>
+                <td>{{ log.reason_str }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No access history yet.</p>
+    {% endif %}
+    <a href="{{ url_for('web.profile') }}" class="btn btn-secondary">Back to Profile</a>
+</div>
+{% endblock %}

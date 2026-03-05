@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Doors{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-2 sidebar p-0">
+            {% include "_sidebar.html" %}
+        </div>
+        <div class="col-md-10 p-4">
+            <h2>Doors</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Location</th>
+                        <th>Type</th>
+                        <th>Associated Unit</th>
+                        <th>Zone</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for door in doors %}
+                    <tr>
+                        <td>{{ door.id }}</td>
+                        <td>{{ door.name }}</td>
+                        <td>{{ door.location }}</td>
+                        <td>{{ door.door_type }}</td>
+                        <td>{{ door.associated_unit or '-' }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('web.assign_door_zone', door_id=door.id) }}">
+                                <select name="zone_id" onchange="this.form.submit()">
+                                    <option value="">-- No zone --</option>
+                                    {% for zone in zones %}
+                                    <option value="{{ zone.id }}" {% if door.zone_id == zone.id %}selected{% endif %}>{{ zone.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                        </td>
+                        <td>
+                            <!-- other actions if needed -->
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

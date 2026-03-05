@@ -91,6 +91,10 @@
                                                 <i class="bi bi-power"></i>
                                             </a>
                                             {% endif %}
+                                            <td>
+    <a href="{{ url_for('web.manage_user_zones', user_id=user.id) }}" class="btn btn-sm btn-info">Zones</a>
+    <!-- existing toggle/unlock buttons -->
+</td>
                                             <button type="button" class="btn btn-info" 
                                                     data-bs-toggle="modal" 
                                                     data-bs-target="#userModal{{ user.id }}"

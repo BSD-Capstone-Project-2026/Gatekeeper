@@ -1,14 +1,19 @@
 # routes/web.py
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session
-from models import db, User
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session, flash
+from models import db, User, Door, AccessLog
+from models import db, User, Door, AccessLog, Zone
 from datetime import datetime, timedelta
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 import secrets
 import string
+from routes.decorators import role_required
+import re
+# Blueprint for access API (door/elevator)
+access_bp = Blueprint('access', __name__, url_prefix='/api/access')
 
 web_bp = Blueprint("web", __name__)
 
-# Login required decorator (using sessions, not Flask-Login)
+# Login required decorator (using sessions)
 def login_required(f):
     from functools import wraps
     @wraps(f)
@@ -27,19 +32,15 @@ def generate_username(first_name, last_name):
     """Generate username as first.last"""
     base = f"{first_name.lower()}.{last_name.lower()}"
     username = base
-    
-    # Check if username exists, add number if it does
     counter = 1
     while User.query.filter_by(username=username).first():
         username = f"{base}{counter}"
         counter += 1
-    
     return username
 
 @web_bp.route("/")
 def home():
     return redirect(url_for("web.login"))
-
 
 @web_bp.route("/login", methods=["GET", "POST"])
 def login():
@@ -63,26 +64,22 @@ def login():
     if user.is_locked:
         return render_template("login.html", error="Account is locked. Contact management.")
 
-    # Check password
     if not user.check_password(password):
-        # Increment failed attempts
         user.failed_login_attempts += 1
         if user.failed_login_attempts >= 3:
             user.is_locked = True
         db.session.commit()
         return render_template("login.html", error="Invalid credentials")
     
-    # SUCCESSFUL LOGIN
+    # Successful login
     user.failed_login_attempts = 0
     db.session.commit()
     
-    # Create JWT token (for API if needed)
     access_token = create_access_token(
         identity=str(user.id),
         additional_claims={"role": user.role}
     )
     
-    # Store user info in session (OUR method, not Flask-Login)
     session['user_id'] = user.id
     session['user_role'] = user.role
     session['user_name'] = f"{user.first_name} {user.last_name}"
@@ -91,21 +88,15 @@ def login():
     
     return redirect(url_for("web.dashboard"))
 
-
 @web_bp.route("/dashboard")
 @login_required
 def dashboard():
     users = User.query.order_by(User.created_at.desc()).all()
-
-    # Initial values (page loads instantly, JS updates later)
     total_users = User.query.count()
     active_users = User.query.filter_by(is_active=True).count()
     locked_users = User.query.filter_by(is_locked=True).count()
-
     week_ago = datetime.utcnow() - timedelta(days=7)
     recent_users = User.query.filter(User.created_at >= week_ago).count()
-    
-    # Get current user role for display
     user_role = session.get('user_role', 'guest')
     user_name = session.get('user_name', 'User')
 
@@ -120,14 +111,92 @@ def dashboard():
         user_name=user_name
     )
 
+# Add near the elevator endpoint in routes/web.py
 
-# ---------------- API ENDPOINTS ----------------
+@access_bp.route('/request', methods=['POST'])
+@jwt_required()
+def request_access():
+    data = request.get_json()
+    print("🔑 /request called with data:", data)   # DEBUG
 
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    door_id = data.get('door_id')
+    wifi_ssid = data.get('wifi_ssid')
+    proximity = data.get('proximity', False)
+
+    print(f"door_id={door_id}, wifi={wifi_ssid}, proximity={proximity}")
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    print(f"user: {user.username}, role={user.role}, unit={user.unit_number}")
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    door = Door.query.get(door_id)
+    if not door:
+        print(f"❌ Door {door_id} not found in DB")
+        return jsonify({"error": "Door not found"}), 404
+
+    print(f"door: {door.name}, type={door.door_type}, assoc_unit={door.associated_unit}")
+
+    # Simulated Wi‑Fi check
+    BUILDING_WIFI = "Avengers-x"
+    wifi_ok = (wifi_ssid == BUILDING_WIFI)
+
+    # Simulated proximity (just a boolean flag)
+    proximity_ok = bool(proximity)
+
+    # Determine if user is allowed by role/unit
+    allowed = False
+    if door.door_type == 'main' and user.role in ['resident', 'concierge', 'management']:
+        allowed = True
+        print("✅ main door allowed")
+    elif door.door_type == 'unit' and door.associated_unit == user.unit_number:
+        allowed = True
+        print("✅ unit door allowed (unit matches)")
+    elif door.door_type == 'common' and user.role in ['concierge', 'management']:
+        allowed = True
+        print("✅ common door allowed")
+
+    # Zone check (if door has a zone, user must have that zone)
+    zone_ok = True
+    if door.zone_id:
+        user_zone_ids = [z.id for z in user.zones]
+        if door.zone_id not in user_zone_ids:
+            zone_ok = False
+            print("❌ zone not allowed")
+
+    # Final decision: permission AND all factors OK
+    success = allowed and wifi_ok and proximity_ok and zone_ok
+    print(f"allowed={allowed}, wifi_ok={wifi_ok}, proximity_ok={proximity_ok}, zone_ok={zone_ok} => success={success}")
+
+    # Log the attempt
+    log = AccessLog(
+        user_id=user.id,
+        door_id=door.id,
+        success=success,
+        wifi_verified=wifi_ok,
+        proximity_verified=proximity_ok,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent')
+    )
+    db.session.add(log)
+    db.session.commit()
+
+    if success:
+        return jsonify({"message": "Door unlocked", "access_granted": True}), 200
+    else:
+        return jsonify({"error": "Access denied", "access_granted": False}), 403
+
+
+# API endpoints for dashboard
 @web_bp.route("/api/dashboard/stats")
 @login_required
 def dashboard_stats():
     week_ago = datetime.utcnow() - timedelta(days=7)
-
     return jsonify({
         "total_users": User.query.count(),
         "active_users": User.query.filter_by(is_active=True).count(),
@@ -138,12 +207,10 @@ def dashboard_stats():
         "resident_count": User.query.filter_by(role="resident").count()
     })
 
-
 @web_bp.route("/api/dashboard/recent-users")
 @login_required
 def recent_users_api():
     users = User.query.order_by(User.created_at.desc()).limit(5).all()
-
     result = []
     for user in users:
         if user.is_locked:
@@ -152,7 +219,6 @@ def recent_users_api():
             status = "inactive"
         else:
             status = "active"
-
         result.append({
             "username": user.username,
             "email": user.email,
@@ -160,9 +226,7 @@ def recent_users_api():
             "status": status,
             "created": user.created_at.strftime("%Y-%m-%d") if user.created_at else "N/A"
         })
-
     return jsonify({"users": result})
-
 
 @web_bp.route("/users")
 @login_required
@@ -170,22 +234,13 @@ def users_list():
     users = User.query.all()
     return render_template("users.html", users=users)
 
-
 @web_bp.route("/users/toggle/<int:user_id>")
 @login_required
-def toggle_user(user_id):  # CHANGED FROM toggle_user_activation
+@role_required('management')
+def toggle_user(user_id):
     user = User.query.get_or_404(user_id)
-    
-    # Check if current user has permission (only management)
-    current_user_role = session.get('user_role')
-    if current_user_role != 'management':
-        return render_template("error.html", 
-                             error="Only management can activate/deactivate users")
-    
-    # Toggle active status
-    user.is_active = not user.is_active
 
-    # If activating user, unlock them
+    user.is_active = not user.is_active
     if user.is_active:
         user.is_locked = False
         user.failed_login_attempts = 0
@@ -194,79 +249,119 @@ def toggle_user(user_id):  # CHANGED FROM toggle_user_activation
     return redirect(url_for("web.users_list"))
 
 
+
+
+@web_bp.route("/doors")
+@login_required
+@role_required('management')
+def list_doors():
+    doors = Door.query.all()
+    zones = Zone.query.all()
+    return render_template("doors.html", doors=doors, zones=zones)
+
+
+
 @web_bp.route("/create-user", methods=["GET", "POST"])
 @login_required
+@role_required('management', 'concierge')
 def create_user():
-    # Get current user's role from session
     current_user_role = session.get('user_role')
-    
-    # Check permissions
-    if current_user_role not in ['management', 'concierge']:
-        return render_template("error.html", 
-                             error="You don't have permission to create users")
+    allowed_roles = ['resident'] if current_user_role == 'concierge' else ['concierge', 'resident']
 
     if request.method == "GET":
-        # Determine allowed roles based on current user's role
-        allowed_roles = ['resident'] if current_user_role == 'concierge' else ['concierge', 'resident']
         return render_template("create_user.html", allowed_roles=allowed_roles)
 
-    # Handle POST request
+    # ---------------------------
+    # Handle POST
+    # ---------------------------
     first_name = request.form.get("first_name")
     last_name = request.form.get("last_name")
     email = request.form.get("email")
     role = request.form.get("role")
 
-    # Validate inputs
     if not all([first_name, last_name, email, role]):
-        allowed_roles = ['resident'] if current_user_role == 'concierge' else ['concierge', 'resident']
-        return render_template("create_user.html", 
-                             error="All fields required",
-                             allowed_roles=allowed_roles)
+        return render_template("create_user.html", error="All fields required", allowed_roles=allowed_roles)
 
-    # Check if user already exists
     if User.query.filter_by(email=email).first():
-        allowed_roles = ['resident'] if current_user_role == 'concierge' else ['concierge', 'resident']
-        return render_template("create_user.html", 
-                             error="User already exists",
-                             allowed_roles=allowed_roles)
-    
-    # Enforce role permissions
-    if current_user_role == 'concierge' and role != 'resident':
-        return render_template("create_user.html", 
-                             error="Concierge can only create resident accounts",
-                             allowed_roles=['resident'])
+        return render_template("create_user.html", error="User already exists", allowed_roles=allowed_roles)
 
-    # Generate credentials
+    if current_user_role == 'concierge' and role != 'resident':
+        return render_template(
+            "create_user.html",
+            error="Concierge can only create resident accounts",
+            allowed_roles=['resident']
+        )
+
     password = generate_password()
     username = generate_username(first_name, last_name)
 
-    # Create new user
+    unit_number = None
+    floor = None
+    door_code = None
+    unit_door = None
+
+    # ---------------------------
+    # Resident logic
+    # ---------------------------
+    if role == 'resident':
+        unit_number = request.form.get("unit_number")
+        if not unit_number:
+            return render_template(
+                "create_user.html",
+                error="Unit number is required for residents",
+                allowed_roles=allowed_roles
+            )
+
+        match = re.match(r"^(\d+)", unit_number)
+        floor = int(match.group(1)) if match else 1
+        door_code = secrets.token_hex(8).upper()
+
+        # Create unit door
+        unit_door = Door(
+            name=f"Unit {unit_number} Door",
+            location=f"Floor {floor}, Unit {unit_number}",
+            door_type="unit",
+            associated_unit=unit_number,
+            is_active=True
+        )
+        db.session.add(unit_door)
+        db.session.flush()  # ✅ get unit_door.id before commit
+
+    # ---------------------------
+    # Create user
+    # ---------------------------
     user = User(
         first_name=first_name,
         last_name=last_name,
         username=username,
         email=email,
-        role=role
+        role=role,
+        unit_number=unit_number,
+        floor=floor,
+        door_code=door_code,
+        door_id=unit_door.id if unit_door else None
     )
     user.set_password(password)
 
     db.session.add(user)
     db.session.commit()
 
-    # Show success with credentials
-    allowed_roles = ['resident'] if current_user_role == 'concierge' else ['concierge', 'resident']
+    user_data = {
+        "username": username,
+        "email": email,
+        "role": role,
+        "temp_password": password,
+        "unit_number": unit_number,
+        "door_code": door_code,
+        "floor": floor
+    }
+
     return render_template(
         "create_user.html",
         success=True,
-        user_data={
-            "username": username,
-            "email": email,
-            "role": role,
-            "temp_password": password
-        },
+        user_data=user_data,
         allowed_roles=allowed_roles
     )
-
 @web_bp.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
     if request.method == "GET":
@@ -276,45 +371,79 @@ def forgot_password():
     user = User.query.filter_by(email=email).first()
     
     if not user:
-        return render_template("forgot_password.html", 
-                             error="No account found with that email")
+        return render_template("forgot_password.html", error="No account found with that email")
     
-    # Generate reset token (simplified)
     reset_token = secrets.token_urlsafe(32)
     user.reset_token = reset_token
     user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
     db.session.commit()
     
-    # In real app: Send email with reset link
-    # For now, just show token
-    return render_template("forgot_password.html",
-                         success=f"Reset token: {reset_token}")
+    return render_template("forgot_password.html", success=f"Reset token: {reset_token}")
 
 @web_bp.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password_with_token(token):
     user = User.query.filter_by(reset_token=token).first()
     
     if not user or user.reset_token_expiry < datetime.utcnow():
-        return render_template("error.html", 
-                             error="Invalid or expired reset token")
+        return render_template("error.html", error="Invalid or expired reset token")
     
     if request.method == "GET":
         return render_template("reset_with_token.html", token=token)
     
-    # ... handle password reset ...
+    # Handle POST: set new password
+    new_password = request.form.get("new_password")
+    confirm = request.form.get("confirm_password")
+    if not new_password or new_password != confirm:
+        return render_template("reset_with_token.html", token=token, error="Passwords do not match")
+    user.set_password(new_password)
+    user.reset_token = None
+    user.reset_token_expiry = None
+    db.session.commit()
+    return redirect(url_for("web.login"))
+
+@web_bp.route("/simulate")
+@login_required
+@role_required('resident')
+def simulate():
+    user_id = session.get('user_id')
+    user = User.query.get(user_id)
+    if not user:
+        return redirect(url_for('web.logout'))
+
+    # Get the main entrance door (type='main')
+    main_door = Door.query.filter_by(door_type='main').first()
+    main_door_id = main_door.id if main_door else None
+
+    return render_template(
+        "simulate.html",
+        unit=user.unit_number,
+        floor=user.floor,
+        door_code=user.door_code,
+        unit_door_id=user.door_id,          # resident's own unit door
+        main_door_id=main_door_id,          # main entrance door
+        jwt_token=session.get("jwt_token")
+    )
+# Access API endpoints (for simulation)
+@access_bp.route('/elevator/call', methods=['POST'])
+@jwt_required()
+def call_elevator():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user or user.role != 'resident':
+        return jsonify({"error": "Only residents can use elevator"}), 403
+    return jsonify({"message": "Elevator summoned", "floor": user.floor}), 200
+
+# (Add more access endpoints as needed, e.g., door unlock)
 
 @web_bp.route("/profile")
 @login_required
 def profile():
     user_id = session.get('user_id')
     user = User.query.get(user_id)
-    
     if not user:
         session.clear()
         return redirect(url_for('web.login'))
-    
     return render_template("profile.html", user=user)
-
 
 @web_bp.route("/reset-password", methods=["GET", "POST"])
 @login_required
@@ -327,44 +456,30 @@ def reset_password():
     confirm_password = request.form.get("confirm_password")
     
     if not all([current_password, new_password, confirm_password]):
-        return render_template("reset_password.html", 
-                             error="All fields are required")
+        return render_template("reset_password.html", error="All fields are required")
     
     if new_password != confirm_password:
-        return render_template("reset_password.html", 
-                             error="New passwords don't match")
+        return render_template("reset_password.html", error="New passwords don't match")
     
     if len(new_password) < 6:
-        return render_template("reset_password.html", 
-                             error="Password must be at least 6 characters")
+        return render_template("reset_password.html", error="Password must be at least 6 characters")
     
-    # Get current user
     user_id = session.get('user_id')
     user = User.query.get(user_id)
     
-    # Check current password
     if not user.check_password(current_password):
-        return render_template("reset_password.html", 
-                             error="Current password is incorrect")
+        return render_template("reset_password.html", error="Current password is incorrect")
     
-    # Update password
     user.set_password(new_password)
-    user.temporary_password = None  # Clear temporary password
+    user.temporary_password = None
     db.session.commit()
     
-    return render_template("reset_password.html", 
-                         success="Password updated successfully!")
-
+    return render_template("reset_password.html", success="Password updated successfully!")
 
 @web_bp.route("/unlock-user/<int:user_id>")
 @login_required
+@role_required('management')
 def unlock_user(user_id):
-    # Check if current user has permission (only management)
-    current_user_role = session.get('user_role')
-    if current_user_role != 'management':
-        return render_template("error.html", 
-                             error="Only management can unlock accounts")
-    
     user = User.query.get(user_id)
     if user:
         user.is_locked = False
@@ -372,6 +487,148 @@ def unlock_user(user_id):
         db.session.commit()
     return redirect(url_for("web.users_list"))
 
+@web_bp.route("/incidents")
+@login_required
+@role_required('management')
+def incidents():
+    # Get date filters from query string (optional)
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    query = AccessLog.query
+
+    if start_date:
+        try:
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            query = query.filter(AccessLog.timestamp >= start)
+        except ValueError:
+            flash("Invalid start date format. Use YYYY-MM-DD.", "error")
+
+    if end_date:
+        try:
+            end = datetime.strptime(end_date + ' 23:59:59', '%Y-%m-%d %H:%M:%S')
+            query = query.filter(AccessLog.timestamp <= end)
+        except ValueError:
+            flash("Invalid end date format. Use YYYY-MM-DD.", "error")
+
+    # Order by most recent first
+    logs = query.order_by(AccessLog.timestamp.desc()).all()
+
+    # For each log, add human‑readable reason
+    for log in logs:
+        user = User.query.get(log.user_id)
+        door = Door.query.get(log.door_id)
+        log.user_name = f"{user.first_name} {user.last_name}" if user else "Unknown"
+        log.door_name = door.name if door else "Unknown"
+        log.reason = []
+        if not log.wifi_verified:
+            log.reason.append("Wi‑Fi mismatch")
+        if not log.proximity_verified:
+            log.reason.append("proximity false")
+        if log.success is False and log.wifi_verified and log.proximity_verified:
+            log.reason.append("permission denied")
+        log.reason_str = ", ".join(log.reason) if log.reason else "Success"
+
+    return render_template("incidents.html", logs=logs, start_date=start_date, end_date=end_date)
+
+
+@web_bp.route("/profile/incidents")
+@login_required
+def my_incidents():
+    user_id = session.get("user_id")
+    logs = AccessLog.query.filter_by(user_id=user_id)\
+        .order_by(AccessLog.timestamp.desc())\
+        .all()
+
+    for log in logs:
+        door = Door.query.get(log.door_id)
+        log.door_name = door.name if door else "Unknown"
+        log.reason = []
+        if not log.wifi_verified:
+            log.reason.append("Wi-Fi mismatch")
+        if not log.proximity_verified:
+            log.reason.append("proximity false")
+        if not log.success and log.wifi_verified and log.proximity_verified:
+            log.reason.append("permission denied")
+        log.reason_str = ", ".join(log.reason) if log.reason else "Success"
+
+    return render_template("my_incidents.html", logs=logs)
+@web_bp.route("/zones")
+@login_required
+@role_required('management')
+def list_zones():
+    zones = Zone.query.all()
+    return render_template("zones.html", zones=zones)
+
+@web_bp.route("/zones/create", methods=["GET", "POST"])
+@login_required
+@role_required('management')
+def create_zone():
+    if request.method == "GET":
+        return render_template("zone_form.html")
+
+    name = request.form.get("name")
+    description = request.form.get("description")
+    if not name:
+        return render_template("zone_form.html", error="Zone name is required")
+
+    zone = Zone(name=name, description=description)
+    db.session.add(zone)
+    db.session.commit()
+    return redirect(url_for("web.list_zones"))
+
+@web_bp.route("/zones/<int:zone_id>/edit", methods=["GET", "POST"])
+@login_required
+@role_required('management')
+def edit_zone(zone_id):
+    zone = Zone.query.get_or_404(zone_id)
+    if request.method == "GET":
+        return render_template("zone_form.html", zone=zone)
+
+    zone.name = request.form.get("name")
+    zone.description = request.form.get("description")
+    db.session.commit()
+    return redirect(url_for("web.list_zones"))
+
+@web_bp.route("/zones/<int:zone_id>/delete", methods=["POST"])
+@login_required
+@role_required('management')
+def delete_zone(zone_id):
+    zone = Zone.query.get_or_404(zone_id)
+    # Check if any doors use this zone
+    if zone.doors:
+        return render_template("error.html", error="Cannot delete zone with assigned doors.")
+    db.session.delete(zone)
+    db.session.commit()
+    return redirect(url_for("web.list_zones"))
+
+@web_bp.route("/doors/<int:door_id>/assign_zone", methods=["POST"])
+@login_required
+@role_required('management')
+def assign_door_zone(door_id):
+    door = Door.query.get_or_404(door_id)
+    zone_id = request.form.get("zone_id")
+    if zone_id:
+        door.zone_id = int(zone_id)
+    else:
+        door.zone_id = None
+    db.session.commit()
+    return redirect(url_for("web.list_doors"))  # we'll need a door list page
+
+@web_bp.route("/users/<int:user_id>/zones", methods=["GET", "POST"])
+@login_required
+@role_required('management')
+def manage_user_zones(user_id):
+    user = User.query.get_or_404(user_id)
+    zones = Zone.query.all()
+    if request.method == "GET":
+        return render_template("user_zones.html", user=user, zones=zones)
+
+    # Update zones: form sends list of zone_ids
+    selected_zone_ids = request.form.getlist("zone_ids")  # list of strings
+    user.zones = [Zone.query.get(int(zid)) for zid in selected_zone_ids]
+    db.session.commit()
+    return redirect(url_for("web.users_list"))
 
 @web_bp.route("/logout")
 def logout():

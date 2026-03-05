@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Zones{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-2 sidebar p-0">{% include "_sidebar.html" %}</div>
+        <div class="col-md-10 p-4">
+            <h2>Zones</h2>
+            <a href="{{ url_for('web.create_zone') }}" class="btn btn-primary mb-3">New Zone</a>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for zone in zones %}
+                    <tr>
+                        <td>{{ zone.name }}</td>
+                        <td>{{ zone.description }}</td>
+                        <td>
+                            <a href="{{ url_for('web.edit_zone', zone_id=zone.id) }}" class="btn btn-sm btn-warning">Edit</a>
+                            <form method="POST" action="{{ url_for('web.delete_zone', zone_id=zone.id) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete zone?')">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

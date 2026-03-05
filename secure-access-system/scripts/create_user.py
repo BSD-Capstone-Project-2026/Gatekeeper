@@ -5,6 +5,8 @@ Run: python scripts/create_user.py
 """
 import sys
 import os
+import re
+import secrets
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import create_app
@@ -49,6 +51,20 @@ with app.app_context():
         # Concierge can only create residents
         role = "resident"
     
+    # Resident-specific fields
+    unit_number = None
+    floor = None
+    door_code = None
+    if role == "resident":
+        unit_number = input("Unit Number (e.g., 12A): ").strip()
+        if not unit_number:
+            print("❌ Unit number is required for residents")
+            sys.exit(1)
+        # Extract floor from unit_number (leading digits)
+        match = re.match(r"^(\d+)", unit_number)
+        floor = int(match.group(1)) if match else 1
+        door_code = secrets.token_hex(8).upper()  # Unique door code like IMEI
+    
     # Check if user exists
     if User.query.filter_by(email=email).first():
         print(f"\n❌ User with email {email} already exists!")
@@ -64,7 +80,10 @@ with app.app_context():
         last_name=last_name,
         username=username,
         email=email,
-        role=role
+        role=role,
+        unit_number=unit_number,
+        floor=floor,
+        door_code=door_code
     )
     user.set_password(temp_password)
     
@@ -76,5 +95,9 @@ with app.app_context():
     print(f"   Email: {email}")
     print(f"   Role: {role}")
     print(f"   Temporary Password: {temp_password}")
-    print("\n⚠️  Note: This user cannot log in until Phase 2")
+    if role == "resident":
+        print(f"   Unit Number: {unit_number}")
+        print(f"   Floor: {floor}")
+        print(f"   Door Code (IMEI): {door_code}")
+    print("\n⚠️  Note: User can now log in and access the simulation if resident.")
     print("="*50)
