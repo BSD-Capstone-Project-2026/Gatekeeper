@@ -246,33 +246,43 @@ def request_access():
     if not success:
         if door.door_type == 'unit' and door.associated_unit:
             unit = door.associated_unit
-            time_window = datetime.utcnow() - timedelta(minutes=10)
+            threshold = current_app.config["INCIDENT_FAILURE_THRESHOLD"]
+            window = current_app.config["INCIDENT_WINDOW_MINUTES"]
+            since = datetime.utcnow() - timedelta(minutes=window)
+
+            last_success = db.session.query(db.func.max(AccessLog.timestamp)).filter(
+                AccessLog.door_id == door.id,
+                AccessLog.success == True,
+                AccessLog.timestamp >= since
+            ).scalar()
 
             recent_failures = AccessLog.query.filter(
                 AccessLog.door_id == door.id,
                 AccessLog.success == False,
-                AccessLog.timestamp >= time_window
-            ).count()
+                AccessLog.timestamp > (last_success or since)
+            ).order_by(AccessLog.timestamp.asc()).all()
 
-            print(f"⚠️ Recent failures: {recent_failures}")
-
-            if recent_failures >= 3:
+            if len(recent_failures) >= threshold:
                 existing = Incident.query.filter_by(
                     unit_number=unit,
                     door_id=door.id,
                     status='open'
                 ).first()
 
-                if not existing:
+                if existing:
+                    existing.attempt_count += 1
+                    existing.last_attempt_time = log.timestamp
+                    db.session.commit()
+                else:
                     incident = Incident(
                         unit_number=unit,
                         door_id=door.id,
                         incident_type='repeated_failed_attempts',
                         status='open',
-                        trigger_rule='3 failed attempts within 10 minutes',
-                        attempt_count=recent_failures,
-                        first_attempt_time=time_window,
-                        last_attempt_time=datetime.utcnow()
+                        trigger_rule=f'{threshold} failed attempts within {window} minutes',
+                        attempt_count=len(recent_failures),
+                        first_attempt_time=recent_failures[0].timestamp,
+                        last_attempt_time=log.timestamp
                     )
                     db.session.add(incident)
                     db.session.commit()

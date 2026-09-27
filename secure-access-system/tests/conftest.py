@@ -2,10 +2,12 @@ import pytest
 from app import create_app
 from config import TestConfig
 from models import db, User, Door
+from routes.web import rate_limiter
 
 
 @pytest.fixture
 def app():
+    rate_limiter.attempts.clear()
     app = create_app(TestConfig)
     with app.app_context():
         yield app

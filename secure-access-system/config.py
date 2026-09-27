@@ -21,6 +21,9 @@ class Config:
     DEMO_USER_EMAIL = "demo@building.local"
     DEMO_USER_PASSWORD = os.environ.get("DEMO_USER_PASSWORD", "DemoPass123")
 
+    INCIDENT_FAILURE_THRESHOLD = 3
+    INCIDENT_WINDOW_MINUTES = 10
+
     # Database reset flag (development only)
     RESET_DB = False  # Set to False once database is stable
 
