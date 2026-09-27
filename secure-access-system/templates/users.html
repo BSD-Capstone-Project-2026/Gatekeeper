@@ -146,15 +146,6 @@
                                                         {% endif %}
                                                     </div>
                                                 </div>
-                                                {% if user.temporary_password %}
-                                                <div class="row mb-3">
-                                                    <div class="col-4"><strong>Temp Password:</strong></div>
-                                                    <div class="col-8">
-                                                        <code>{{ user.temporary_password }}</code>
-                                                        <small class="text-muted d-block">(Generated on creation)</small>
-                                                    </div>
-                                                </div>
-                                                {% endif %}
                                                 <div class="row">
                                                     <div class="col-4"><strong>Created:</strong></div>
                                                     <div class="col-8">{{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else 'N/A' }}</div>

@@ -70,7 +70,7 @@ def create_user():
         email=email,
         role=role
     )
-    user.set_password(temp_password)  # This also stores temp_password in DB
+    user.set_password(temp_password)
 
     db.session.add(user)
     db.session.commit()

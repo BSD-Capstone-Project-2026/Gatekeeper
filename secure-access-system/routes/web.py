@@ -701,7 +701,6 @@ def reset_password():
         return render_template("reset_password.html", error="Current password is incorrect")
     
     user.set_password(new_password)
-    user.temporary_password = None
     db.session.commit()
     
     return render_template("reset_password.html", success="Password updated successfully!")
