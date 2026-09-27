@@ -1,5 +1,5 @@
 # routes/web.py
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session, flash
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session, flash, current_app
 from models import db, User, Door, AccessLog, Zone, AuditLog
 from datetime import datetime, timedelta
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
@@ -79,7 +79,7 @@ def home():
 @web_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
-        return render_template("login.html")
+        return render_template("login.html", success="Password updated. Please log in." if request.args.get("reset") else None)
 
     email = request.form.get("email")
     password = request.form.get("password")
@@ -591,16 +591,14 @@ def forgot_password():
     
     email = request.form.get("email")
     user = User.query.filter_by(email=email).first()
-    
-    if not user:
-        return render_template("forgot_password.html", error="No account found with that email")
-    
-    reset_token = secrets.token_urlsafe(32)
-    user.reset_token = reset_token
-    user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
-    db.session.commit()
-    
-    return render_template("forgot_password.html", success=f"Reset token: {reset_token}")
+
+    if user:
+        user.reset_token = secrets.token_urlsafe(32)
+        user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
+        db.session.commit()
+        current_app.logger.info("Password reset link for %s: %s", user.email, url_for("web.reset_password_with_token", token=user.reset_token, _external=True))
+
+    return render_template("forgot_password.html", success="If an account exists for that email, a reset link has been sent.")
 
 @web_bp.route("/audit")
 @login_required
@@ -613,22 +611,22 @@ def audit_logs():
 def reset_password_with_token(token):
     user = User.query.filter_by(reset_token=token).first()
     
-    if not user or user.reset_token_expiry < datetime.utcnow():
-        return render_template("error.html", error="Invalid or expired reset token")
-    
+    if not user or not user.reset_token_expiry or user.reset_token_expiry < datetime.utcnow():
+        return render_template("reset_with_token.html", invalid=True)
+
     if request.method == "GET":
         return render_template("reset_with_token.html", token=token)
-    
-    # Handle POST: set new password
-    new_password = request.form.get("new_password")
-    confirm = request.form.get("confirm_password")
-    if not new_password or new_password != confirm:
+
+    new_password = request.form.get("new_password") or ""
+    if len(new_password) < 8:
+        return render_template("reset_with_token.html", token=token, error="Password must be at least 8 characters")
+    if new_password != request.form.get("confirm_password"):
         return render_template("reset_with_token.html", token=token, error="Passwords do not match")
     user.set_password(new_password)
     user.reset_token = None
     user.reset_token_expiry = None
     db.session.commit()
-    return redirect(url_for("web.login"))
+    return redirect(url_for("web.login", reset=1))
 
 
 
