@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Incident Details{% endblock %}
+{% block content %}
+<div class="container">
+    <h2>Incident #{{ incident.id }}</h2>
+    <p><strong>Unit:</strong> {{ incident.unit_number }}</p>
+    <p><strong>Trigger Rule:</strong> {{ incident.trigger_rule }}</p>
+    <p><strong>Attempts:</strong> {{ incident.attempt_count }}</p>
+    <p><strong>Time window:</strong> {{ incident.first_attempt_time }} to {{ incident.last_attempt_time }}</p>
+    <h3>Related Events</h3>
+    <table class="table">
+        <thead>
+            <tr><th>Timestamp</th><th>Success</th><th>Failure Reason</th></tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.timestamp }}</td>
+                <td>{{ '❌' if not log.success else '✅' }}</td>
+                <td>{{ log.failure_reason or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a href="{{ url_for('web.incidents') }}" class="btn btn-secondary">Back</a>
+</div>
+{% endblock %}

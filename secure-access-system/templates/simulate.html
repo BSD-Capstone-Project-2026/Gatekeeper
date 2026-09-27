@@ -56,17 +56,40 @@
             </div>
         </div>
     </div>
+
+    <!-- Wi‑Fi Input (simulated) -->
+    <div class="row mt-3">
+        <div class="col text-center">
+            <label for="wifiInput" class="form-label">Your current Wi‑Fi (simulated):</label>
+            <input type="text" id="wifiInput" class="form-control d-inline-block w-auto" placeholder="Enter SSID" value="Avengers-x">
+            <button class="btn btn-sm btn-secondary" onclick="updateWifi()">Update</button>
+        </div>
+    </div>
 </div>
 
-<!-- JavaScript to call APIs and update UI -->
 <script>
     const jwtToken = "{{ jwt_token }}";
     const MAIN_DOOR_ID = {{ main_door_id }};
     const UNIT_DOOR_ID = {{ unit_door_id }};
-    const BUILDING_WIFI = "Avengers-x";   // Consistent SSID
+    const BUILDING_WIFI = "Avengers-x";   // the expected building Wi‑Fi
+
+    // Read the current value from the input field
+    function getWifi() {
+        const input = document.getElementById('wifiInput');
+        return input ? input.value : BUILDING_WIFI;
+    }
+
+    // Optional: log the current value (or you can just rely on getWifi)
+    function updateWifi() {
+        const val = getWifi();
+        log(`Wi‑Fi set to: ${val}`, 'info');
+    }
 
     function log(message, type = 'info') {
         const logPanel = document.getElementById('log-panel');
+        // Remove the placeholder if it exists
+        const empty = logPanel.querySelector('.text-muted');
+        if (empty && empty.innerText === 'No events yet') empty.remove();
         const entry = document.createElement('p');
         entry.className = type === 'success' ? 'text-success' : (type === 'error' ? 'text-danger' : '');
         entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
@@ -88,9 +111,10 @@
 
     async function unlockMainDoor() {
         log('Attempting to unlock main door...');
+        const wifi_ssid = getWifi();
         const res = await callAPI('/api/access/request', {
             door_id: MAIN_DOOR_ID,
-            wifi_ssid: BUILDING_WIFI,
+            wifi_ssid: wifi_ssid,
             proximity: true
         });
         const data = await res.json();
@@ -107,9 +131,10 @@
     
     async function unlockUnitDoor() {
         log('Attempting to unlock unit door...');
+        const wifi_ssid = getWifi();
         const res = await callAPI('/api/access/request', {
             door_id: UNIT_DOOR_ID,
-            wifi_ssid: BUILDING_WIFI,
+            wifi_ssid: wifi_ssid,
             proximity: true
         });
         const data = await res.json();
@@ -132,7 +157,6 @@
         const res = await callAPI('/api/access/elevator/call', {});
         const data = await res.json();
         if (res.ok) {
-            // Simulate elevator moving
             let current = 1;
             const target = parseInt("{{ floor | default(1) }}");
             const interval = setInterval(() => {

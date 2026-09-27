@@ -16,6 +16,20 @@
                 <span class="badge bg-primary">{{ user_name }}</span>
             </div>
 
+            <!-- System Health Status -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body py-2">
+                            <i class="bi bi-activity me-2"></i> System Health:
+                            <span id="server-status" class="badge bg-success ms-2">● Server</span>
+                            <span id="db-status" class="badge bg-success ms-2">● Database</span>
+                            <span id="network-status" class="badge bg-success ms-2">● Network</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Stats Cards -->
             <div class="row g-4 mb-4">
                 <div class="col-md-3">
@@ -85,10 +99,6 @@
                                         <i class="bi bi-exclamation-triangle"></i> Incidents
                                     </a>
                                 {% endif %}
-                                <a href="#" class="list-group-item list-group-item-action">
-                                    <i class="bi bi-shield-check me-2"></i>
-                                    System Status: <span class="badge bg-success">Operational</span>
-                                </a>
                             </div>
                         </div>
                     </div>
@@ -141,28 +151,71 @@
 </div>
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // Chart.js configuration (optional, you can keep your existing code)
-    document.addEventListener('DOMContentLoaded', function() {
-        fetch('/api/dashboard/stats')
-            .then(response => response.json())
-            .then(data => {
-                const ctx = document.getElementById('roleChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Management', 'Concierge', 'Resident'],
-                        datasets: [{
-                            data: [data.management_count, data.concierge_count, data.resident_count],
-                            backgroundColor: ['#dc3545', '#ffc107', '#0dcaf0'],
-                            borderWidth: 1
-                        }]
-                    },
-                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-                });
-            })
-            .catch(err => console.error('Error loading stats:', err));
-    });
+document.addEventListener('DOMContentLoaded', function() {
+    // Chart for user distribution
+    fetch('/api/dashboard/stats')
+        .then(response => response.json())
+        .then(data => {
+            const ctx = document.getElementById('roleChart').getContext('2d');
+
+            // Destroy existing chart if it exists (Chart.js v3 method)
+            const existingChart = Chart.getChart(ctx);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Management', 'Concierge', 'Resident'],
+                    datasets: [{
+                        data: [
+                            data.management_count,
+                            data.concierge_count,
+                            data.resident_count
+                        ],
+                        backgroundColor: ['#dc3545', '#ffc107', '#0dcaf0'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        })
+        .catch(err => console.error('Error loading stats:', err));
+});
+
+// Health check function
+function updateHealth() {
+    fetch('/health')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('server-status').className = 'badge bg-success';
+            document.getElementById('server-status').innerHTML = '● Server';
+
+            document.getElementById('db-status').className = data.database === 'healthy' ? 'badge bg-success' : 'badge bg-danger';
+            document.getElementById('db-status').innerHTML = data.database === 'healthy' ? '● Database' : '✗ Database';
+
+            document.getElementById('network-status').className = 'badge bg-success';
+            document.getElementById('network-status').innerHTML = '● Network';
+        })
+        .catch(() => {
+            document.getElementById('server-status').className = 'badge bg-danger';
+            document.getElementById('server-status').innerHTML = '✗ Server';
+            document.getElementById('db-status').className = 'badge bg-danger';
+            document.getElementById('db-status').innerHTML = '✗ Database';
+            document.getElementById('network-status').className = 'badge bg-danger';
+            document.getElementById('network-status').innerHTML = '✗ Network';
+        });
+}
+updateHealth();
+setInterval(updateHealth, 30000); // refresh every 30 seconds
 </script>
 {% endblock %}
 {% endblock %}

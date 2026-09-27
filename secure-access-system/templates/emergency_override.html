@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Emergency Override{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mt-4">Emergency Door Override</h2>
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>Warning:</strong> This action will unlock a door immediately. A reason is required and will be audited.
+    </div>
+    <form method="POST" class="mt-4">
+        <div class="mb-3">
+            <label for="door_id" class="form-label">Select Door</label>
+            <select name="door_id" id="door_id" class="form-select" required>
+                <option value="">-- Choose a door --</option>
+                {% for door in doors %}
+                <option value="{{ door.id }}">{{ door.name }} ({{ door.location or 'N/A' }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="reason" class="form-label">Reason for Override *</label>
+            <textarea name="reason" id="reason" class="form-control" rows="3" required placeholder="e.g., fire alarm, medical emergency, maintenance"></textarea>
+        </div>
+        <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="confirm" name="confirm" value="yes" required>
+            <label class="form-check-label" for="confirm">I confirm this emergency override is necessary</label>
+        </div>
+        <button type="submit" class="btn btn-danger">Execute Override</button>
+        <a href="{{ url_for('web.dashboard') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

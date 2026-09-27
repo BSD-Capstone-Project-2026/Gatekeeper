@@ -1,17 +1,51 @@
 # routes/web.py
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session, flash
-from models import db, User, Door, AccessLog
-from models import db, User, Door, AccessLog, Zone
+from models import db, User, Door, AccessLog, Zone, AuditLog
 from datetime import datetime, timedelta
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 import secrets
 import string
 from routes.decorators import role_required
+from collections import defaultdict
+from datetime import datetime, timedelta
 import re
+import time
+from datetime import datetime, timedelta
+from models import Incident
+
 # Blueprint for access API (door/elevator)
 access_bp = Blueprint('access', __name__, url_prefix='/api/access')
-
+start_time = time.time()
 web_bp = Blueprint("web", __name__)
+
+class RateLimiter:
+    def __init__(self, max_attempts=5, window_seconds=60, block_seconds=300):
+        self.max_attempts = max_attempts
+        self.window_seconds = window_seconds
+        self.block_seconds = block_seconds
+        self.attempts = defaultdict(list)  # key: user_id:door_id, value: list of timestamps
+
+    def is_allowed(self, user_id, door_id):
+        key = f"{user_id}:{door_id}"
+        now = datetime.utcnow()
+        # Remove old attempts outside the window
+        self.attempts[key] = [ts for ts in self.attempts[key] if now - ts < timedelta(seconds=self.window_seconds)]
+        if len(self.attempts[key]) >= self.max_attempts:
+            # Check if block period has passed
+            oldest = min(self.attempts[key])
+            if now - oldest < timedelta(seconds=self.block_seconds):
+                return False, f"Rate limit exceeded. Too many attempts. Try again later."
+            else:
+                # Reset after block period
+                self.attempts[key] = []
+        return True, None
+
+    def record_attempt(self, user_id, door_id):
+        key = f"{user_id}:{door_id}"
+        self.attempts[key].append(datetime.utcnow())
+
+# Create a global instance
+rate_limiter = RateLimiter()
 
 # Login required decorator (using sessions)
 def login_required(f):
@@ -117,7 +151,7 @@ def dashboard():
 @jwt_required()
 def request_access():
     data = request.get_json()
-    print("🔑 /request called with data:", data)   # DEBUG
+    print("🔑 /request called with data:", data)
 
     if not data:
         return jsonify({"error": "No data provided"}), 400
@@ -142,26 +176,31 @@ def request_access():
 
     print(f"door: {door.name}, type={door.door_type}, assoc_unit={door.associated_unit}")
 
-    # Simulated Wi‑Fi check
+    # Rate limiting check (before processing)
+    allowed, message = rate_limiter.is_allowed(user.id, door.id)
+    if not allowed:
+        return jsonify({"error": message, "access_granted": False}), 429
+
+    # Simulated Wi-Fi check
     BUILDING_WIFI = "Avengers-x"
     wifi_ok = (wifi_ssid == BUILDING_WIFI)
 
-    # Simulated proximity (just a boolean flag)
+    # Simulated proximity
     proximity_ok = bool(proximity)
 
     # Determine if user is allowed by role/unit
-    allowed = False
+    permission = False
     if door.door_type == 'main' and user.role in ['resident', 'concierge', 'management']:
-        allowed = True
+        permission = True
         print("✅ main door allowed")
     elif door.door_type == 'unit' and door.associated_unit == user.unit_number:
-        allowed = True
+        permission = True
         print("✅ unit door allowed (unit matches)")
     elif door.door_type == 'common' and user.role in ['concierge', 'management']:
-        allowed = True
+        permission = True
         print("✅ common door allowed")
 
-    # Zone check (if door has a zone, user must have that zone)
+    # Zone check
     zone_ok = True
     if door.zone_id:
         user_zone_ids = [z.id for z in user.zones]
@@ -169,9 +208,22 @@ def request_access():
             zone_ok = False
             print("❌ zone not allowed")
 
-    # Final decision: permission AND all factors OK
-    success = allowed and wifi_ok and proximity_ok and zone_ok
-    print(f"allowed={allowed}, wifi_ok={wifi_ok}, proximity_ok={proximity_ok}, zone_ok={zone_ok} => success={success}")
+    # Final decision
+    success = permission and wifi_ok and proximity_ok and zone_ok
+    print(f"permission={permission}, wifi_ok={wifi_ok}, proximity_ok={proximity_ok}, zone_ok={zone_ok} => success={success}")
+
+    reasons = []
+    if not success:
+        if not permission:
+            reasons.append("permission denied")
+        if not wifi_ok:
+            reasons.append("wifi mismatch")
+        if not proximity_ok:
+            reasons.append("proximity false")
+        if not zone_ok:
+            reasons.append("zone restriction")
+
+    failure_reason = ", ".join(reasons)
 
     # Log the attempt
     log = AccessLog(
@@ -179,6 +231,7 @@ def request_access():
         door_id=door.id,
         success=success,
         wifi_verified=wifi_ok,
+        failure_reason=failure_reason,
         proximity_verified=proximity_ok,
         ip_address=request.remote_addr,
         user_agent=request.headers.get('User-Agent')
@@ -186,11 +239,161 @@ def request_access():
     db.session.add(log)
     db.session.commit()
 
+    # Record the attempt for rate limiting (after logging)
+    rate_limiter.record_attempt(user.id, door.id)
+
+    # Detect repeated failed attempts
+    if not success:
+        if door.door_type == 'unit' and door.associated_unit:
+            unit = door.associated_unit
+            time_window = datetime.utcnow() - timedelta(minutes=10)
+
+            recent_failures = AccessLog.query.filter(
+                AccessLog.door_id == door.id,
+                AccessLog.success == False,
+                AccessLog.timestamp >= time_window
+            ).count()
+
+            print(f"⚠️ Recent failures: {recent_failures}")
+
+            if recent_failures >= 3:
+                existing = Incident.query.filter_by(
+                    unit_number=unit,
+                    door_id=door.id,
+                    status='open'
+                ).first()
+
+                if not existing:
+                    incident = Incident(
+                        unit_number=unit,
+                        door_id=door.id,
+                        incident_type='repeated_failed_attempts',
+                        status='open',
+                        trigger_rule='3 failed attempts within 10 minutes',
+                        attempt_count=recent_failures,
+                        first_attempt_time=time_window,
+                        last_attempt_time=datetime.utcnow()
+                    )
+                    db.session.add(incident)
+                    db.session.commit()
+
+                    # Notify resident (requires Notification model)
+                    resident = User.query.filter_by(
+                        unit_number=unit,
+                        role='resident'
+                    ).first()
+
+                    if resident:
+                        # TODO: Create Notification model and uncomment
+                        # notification = Notification(
+                        #     user_id=resident.id,
+                        #     incident_id=incident.id,
+                        #     message=f"Security alert: {recent_failures} failed attempts on your unit door ({door.name}) within 10 minutes.",
+                        #     status='queued'
+                        # )
+                        # db.session.add(notification)
+                        # db.session.commit()
+                        print(f"📩 Notification would be queued for {resident.email}")
+
+    # Final response
     if success:
         return jsonify({"message": "Door unlocked", "access_granted": True}), 200
     else:
         return jsonify({"error": "Access denied", "access_granted": False}), 403
 
+@web_bp.route("/api/notifications")
+@login_required
+def get_notifications():
+    user_id = session.get('user_id')
+    notifs = Notification.query.filter_by(user_id=user_id).order_by(Notification.created_at.desc()).all()
+    return jsonify([{
+        'id': n.id,
+        'message': n.message,
+        'status': n.status,
+        'created_at': n.created_at.isoformat()
+    } for n in notifs])
+
+
+@web_bp.route("/api/incidents/<int:incident_id>")
+@login_required
+@role_required('management')
+def incident_detail(incident_id):
+    incident = Incident.query.get_or_404(incident_id)
+    logs = incident.get_related_logs()
+    return jsonify({
+        'id': incident.id,
+        'unit_number': incident.unit_number,
+        'door_id': incident.door_id,
+        'incident_type': incident.incident_type,
+        'status': incident.status,
+        'trigger_rule': incident.trigger_rule,
+        'attempt_count': incident.attempt_count,
+        'first_attempt_time': incident.first_attempt_time.isoformat(),
+        'last_attempt_time': incident.last_attempt_time.isoformat(),
+        'created_at': incident.created_at.isoformat(),
+        'events': [{
+            'timestamp': log.timestamp.isoformat(),
+            'success': log.success,
+            'failure_reason': log.failure_reason,
+            'wifi_verified': log.wifi_verified,
+            'proximity_verified': log.proximity_verified
+        } for log in logs]
+    })
+
+@web_bp.route("/incidents/<int:incident_id>")
+@login_required
+@role_required('management')
+def incident_view(incident_id):
+    incident = Incident.query.get_or_404(incident_id)
+    logs = incident.get_related_logs()
+    return render_template("incident_detail.html", incident=incident, logs=logs)
+
+@web_bp.route("/incident-list")
+@login_required
+@role_required('management')
+def incident_list():
+    incidents = Incident.query.order_by(Incident.created_at.desc()).all()
+    return render_template("incident_list.html", incidents=incidents)
+
+@web_bp.route("/emergency-override", methods=["GET", "POST"])
+@login_required
+@role_required('management')
+def emergency_override():
+    if request.method == "GET":
+        doors = Door.query.all()
+        return render_template("emergency_override.html", doors=doors)
+
+    # POST: execute override
+    door_id = request.form.get("door_id")
+    reason = request.form.get("reason")
+    confirm = request.form.get("confirm")
+
+    if not door_id or not reason:
+        flash("Door and reason are required.", "error")
+        return redirect(url_for("web.emergency_override"))
+
+    if confirm != "yes":
+        flash("You must confirm the override.", "error")
+        return redirect(url_for("web.emergency_override"))
+
+    door = Door.query.get(door_id)
+    if not door:
+        flash("Door not found.", "error")
+        return redirect(url_for("web.emergency_override"))
+
+    # Log the override
+    audit = AuditLog(
+        user_id=session.get('user_id'),
+        action="emergency_override",
+        details=f"Emergency override executed on door '{door.name}' (ID {door.id}). Reason: {reason}",
+        performed_by=session.get('user_id')
+    )
+    db.session.add(audit)
+    db.session.commit()
+
+    # Simulate unlocking (in real system, call hardware API here)
+    flash(f"✅ Emergency override executed for door '{door.name}'. Reason: {reason}", "success")
+    return redirect(url_for("web.dashboard"))
 
 # API endpoints for dashboard
 @web_bp.route("/api/dashboard/stats")
@@ -245,6 +448,16 @@ def toggle_user(user_id):
         user.is_locked = False
         user.failed_login_attempts = 0
 
+    db.session.commit()
+    # Audit log
+    action = "activate" if user.is_active else "deactivate"
+    audit = AuditLog(
+        user_id=user.id,
+        action=action,
+        details=f"User {user.username} toggled active status",
+        performed_by=session.get('user_id')
+        )
+    db.session.add(audit)
     db.session.commit()
     return redirect(url_for("web.users_list"))
 
@@ -344,6 +557,15 @@ def create_user():
     user.set_password(password)
 
     db.session.add(user)
+    db.session.flush()
+    # After successful user creation, add:
+    audit = AuditLog(
+    user_id=user.id,
+    action='create',
+    details=f"User {user.username} created with role {user.role}",
+    performed_by=session.get('user_id')
+    )
+    db.session.add(audit)
     db.session.commit()
 
     user_data = {
@@ -380,6 +602,13 @@ def forgot_password():
     
     return render_template("forgot_password.html", success=f"Reset token: {reset_token}")
 
+@web_bp.route("/audit")
+@login_required
+@role_required('management')
+def audit_logs():
+    logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).all()
+    return render_template("audit_logs.html", logs=logs)
+
 @web_bp.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password_with_token(token):
     user = User.query.filter_by(reset_token=token).first()
@@ -401,6 +630,8 @@ def reset_password_with_token(token):
     db.session.commit()
     return redirect(url_for("web.login"))
 
+
+
 @web_bp.route("/simulate")
 @login_required
 @role_required('resident')
@@ -410,7 +641,6 @@ def simulate():
     if not user:
         return redirect(url_for('web.logout'))
 
-    # Get the main entrance door (type='main')
     main_door = Door.query.filter_by(door_type='main').first()
     main_door_id = main_door.id if main_door else None
 
@@ -419,11 +649,11 @@ def simulate():
         unit=user.unit_number,
         floor=user.floor,
         door_code=user.door_code,
-        unit_door_id=user.door_id,          # resident's own unit door
-        main_door_id=main_door_id,          # main entrance door
+        unit_door_id=user.door_id,          # from the user's door relation
+        main_door_id=main_door_id,
         jwt_token=session.get("jwt_token")
     )
-# Access API endpoints (for simulation)
+
 @access_bp.route('/elevator/call', methods=['POST'])
 @jwt_required()
 def call_elevator():
@@ -476,6 +706,25 @@ def reset_password():
     
     return render_template("reset_password.html", success="Password updated successfully!")
 
+
+
+from sqlalchemy import text   # add this import at the top
+
+@web_bp.route('/health')
+def health():
+    db_status = 'healthy'
+    try:
+        db.session.execute(text('SELECT 1')).scalar()   # wrap with text()
+    except Exception as e:
+        db_status = 'unhealthy'
+        print("="*50)
+        print("❌ Database health check failed!")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {e}")
+        print("="*50)
+    return jsonify({'server': 'healthy', 'database': db_status, 'network': 'healthy'})
+
+
 @web_bp.route("/unlock-user/<int:user_id>")
 @login_required
 @role_required('management')
@@ -484,6 +733,14 @@ def unlock_user(user_id):
     if user:
         user.is_locked = False
         user.failed_login_attempts = 0
+        db.session.commit()
+        audit = AuditLog(
+            user_id=user.id,
+            action='unlock',
+            details=f"User {user.username} unlocked",
+            performed_by=session.get('user_id')
+        )
+        db.session.add(audit)
         db.session.commit()
     return redirect(url_for("web.users_list"))
 

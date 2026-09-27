@@ -5,13 +5,46 @@ from flask import Flask
 from flask_jwt_extended import JWTManager
 from flask_login import LoginManager
 from config import Config
-from models import db, User, Door, Zone
+from models import db, User, Door, Zone, AccessLog, AccessLogArchive
 from routes.web import access_bp, web_bp
 from routes.auth import auth_bp
 from routes.users import users_bp
 from routes.protected import protected_bp
 from routes.dashboard import dashboard_bp
 import secrets
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime, timedelta
+import subprocess
+
+scheduler = BackgroundScheduler()
+
+
+def archive_old_logs():
+    cutoff = datetime.utcnow() - timedelta(days=90)   # adjust retention period
+    old_logs = AccessLog.query.filter(AccessLog.timestamp < cutoff).all()
+
+    for log in old_logs:
+        archive = AccessLogArchive(
+            user_id=log.user_id,
+            door_id=log.door_id,
+            timestamp=log.timestamp,
+            success=log.success,
+            failure_reason=log.failure_reason,
+            wifi_verified=log.wifi_verified,
+            proximity_verified=log.proximity_verified,
+            ip_address=log.ip_address,
+            user_agent=log.user_agent
+        )
+        db.session.add(archive)
+        db.session.delete(log)
+
+    db.session.commit()
+    print(f"Archived {len(old_logs)} old access logs.")
+
+
+def backup_task():
+    subprocess.run(['python', 'scripts/backup.py'])
+
 
 def create_app():
     app = Flask(__name__, template_folder='templates')
@@ -95,6 +128,7 @@ def create_app():
             amenities = Zone(name="Amenities", description="Common amenities")
             ground = Zone(name="Ground", description="Ground floor")
             rooftop = Zone(name="Rooftop", description="Rooftop terrace")
+
             db.session.add_all([gym, amenities, ground, rooftop])
             db.session.commit()
             print("✅ Zones seeded")
@@ -103,8 +137,8 @@ def create_app():
             print("ℹ️ Zones already exist")
 
         # ----- Doors -----
-        # Create main entrance if not exists
         main_door = Door.query.filter_by(name="Main Entrance").first()
+
         if not main_door:
             main_door = Door(
                 name="Main Entrance",
@@ -120,6 +154,7 @@ def create_app():
 
         # Assign main door to Ground zone
         ground = Zone.query.filter_by(name="Ground").first()
+
         if ground and main_door.zone_id != ground.id:
             main_door.zone_id = ground.id
             db.session.commit()
@@ -127,20 +162,29 @@ def create_app():
 
         # Ensure all unit doors have no zone
         unit_doors = Door.query.filter_by(door_type="unit").all()
+
         for door in unit_doors:
             if door.zone_id is not None:
                 door.zone_id = None
+
         if unit_doors:
             db.session.commit()
             print("✅ Unit doors cleared from zones")
 
         # Create unit doors for existing residents if missing
         residents = User.query.filter_by(role="resident").all()
+
         for resident in residents:
+
             if resident.door_id is None:
-                existing_door = Door.query.filter_by(associated_unit=resident.unit_number).first()
+
+                existing_door = Door.query.filter_by(
+                    associated_unit=resident.unit_number
+                ).first()
+
                 if existing_door:
                     resident.door_id = existing_door.id
+
                 else:
                     door = Door(
                         name=f"Unit {resident.unit_number} Door",
@@ -150,15 +194,20 @@ def create_app():
                         is_active=True,
                         zone_id=None
                     )
+
                     db.session.add(door)
                     db.session.flush()
+
                     resident.door_id = door.id
+
                 print(f"✅ Door created for resident {resident.username}")
+
         db.session.commit()
 
         # ----- Assign test resident to Ground zone -----
         if ground:
             resident = User.query.filter_by(email="resident@test.com").first()
+
             if resident and ground not in resident.zones:
                 resident.zones.append(ground)
                 db.session.commit()
@@ -166,12 +215,20 @@ def create_app():
             else:
                 print("ℹ️ Test resident already in Ground zone")
 
+        # ----- Scheduler Jobs -----
+        scheduler.add_job(func=archive_old_logs, trigger="interval", days=1)
+        scheduler.add_job(func=backup_task, trigger="interval", days=1)
+
+        if not scheduler.running:
+            scheduler.start()
+
     # Root route
     @app.route("/")
     def home():
         return "Secure Access System – Phase 1 Step 1 Running"
 
     return app
+
 
 if __name__ == "__main__":
     app = create_app()

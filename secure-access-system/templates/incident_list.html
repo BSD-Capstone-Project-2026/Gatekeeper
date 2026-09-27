@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Incident List{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-2 sidebar p-0">
+            {% include "_sidebar.html" %}
+        </div>
+        <div class="col-md-10 p-4">
+            <h2><i class="bi bi-exclamation-triangle"></i> Security Incidents</h2>
+            {% if incidents %}
+            <table class="table">
+                <thead>
+                    <tr><th>ID</th><th>Unit</th><th>Trigger Rule</th><th>Attempts</th><th>Time</th><th>Status</th><th>Details</th></tr>
+                </thead>
+                <tbody>
+                    {% for inc in incidents %}
+                    <tr>
+                        <td>{{ inc.id }}</td>
+                        <td>{{ inc.unit_number }}</td>
+                        <td>{{ inc.trigger_rule }}</td>
+                        <td>{{ inc.attempt_count }}</td>
+                        <td>{{ inc.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ inc.status }}</td>
+                        <td><a href="{{ url_for('web.incident_view', incident_id=inc.id) }}" class="btn btn-sm btn-primary">View</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>No incidents yet. Trigger 3 failed attempts on a unit door to create one.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

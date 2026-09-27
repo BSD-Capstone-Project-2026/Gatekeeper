@@ -6,7 +6,15 @@
     {% if session.user_role in ['management', 'concierge'] %}
     <a href="{{ url_for('web.users_list') }}"><i class="bi bi-people"></i> Users</a>
     <a href="{{ url_for('web.create_user') }}"><i class="bi bi-person-plus"></i> Create User</a>
+    <a href="{{ url_for('web.incident_list') }}">
+        <i class="bi bi-exclamation-triangle"></i> Incidents
+    </a>
+    <a href="{{ url_for('web.emergency_override') }}">
+        <i class="bi bi-shield-exclamation"></i> Emergency Override
+    </a>
     {% endif %}
+
+    
 
     {% if session.user_role == 'management' %}
     <a href="{{ url_for('web.list_zones') }}"><i class="bi bi-grid-3x3-gap-fill"></i> Zones</a>
