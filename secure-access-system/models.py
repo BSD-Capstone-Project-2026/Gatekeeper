@@ -80,15 +80,6 @@ class Incident(db.Model):
             AccessLog.timestamp >= self.first_attempt_time,
             AccessLog.timestamp <= self.last_attempt_time
         ).order_by(AccessLog.timestamp.asc()).all()
-    door = db.relationship('Door')
-    def get_related_logs(self):
-        # Get failed attempts for this door within the time window
-         return AccessLog.query.filter(
-            AccessLog.door_id == self.door_id,
-            AccessLog.success == False,
-            AccessLog.timestamp >= self.first_attempt_time,
-            AccessLog.timestamp <= self.last_attempt_time
-        ).order_by(AccessLog.timestamp.asc()).all()
 
 class Notification(db.Model):
     __tablename__ = 'notifications'
