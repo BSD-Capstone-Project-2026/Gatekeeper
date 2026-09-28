@@ -74,23 +74,24 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 
 ```bash
 # clone the repository
-git clone https://github.com/Navish7/<repo-name>.git
-cd <repo-name>
+git clone https://github.com/BSD-Capstone-Project-2026/Gatekeeper.git
+cd Gatekeeper/secure-access-system
 
 # create and activate a virtual environment
 python -m venv venv
 source venv/bin/activate        # on Windows: venv\Scripts\activate
 
 # install dependencies
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
+
+# run the tests
+pytest
 
 # run the app
 python app.py
 ```
 
-Then open `http://localhost:5000` in your browser.
-
-> Replace `<repo-name>` with the actual repository name, and adjust the run command (`python app.py`) if your entry point differs.
+Then open `http://localhost:5000` in your browser. The database is created and seeded in `instance/` on first run.
 
 ---
 

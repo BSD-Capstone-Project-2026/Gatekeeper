@@ -46,9 +46,9 @@ def backup_task():
     subprocess.run(['python', 'scripts/backup.py'])
 
 
-def create_app():
+def create_app(config=Config):
     app = Flask(__name__, template_folder='templates')
-    app.config.from_object(Config)
+    app.config.from_object(config)
 
     # Initialize Extensions
     db.init_app(app)
@@ -73,6 +73,8 @@ def create_app():
     # Database Setup + Seeding
     with app.app_context():
         db.create_all()
+        if app.config.get("TESTING"):
+            return app
 
         # ----- Users -----
         demo_user = User.query.filter_by(email=Config.DEMO_USER_EMAIL).first()
