@@ -89,11 +89,16 @@ def filter_by_dates(query, column, start_date, end_date):
             errors.append("Invalid end date format. Use YYYY-MM-DD.")
     return query, errors
 
+CREATABLE_ROLES = {'management': ['concierge', 'resident', 'guest', 'cleaner'], 'concierge': ['resident', 'guest']}
+DOOR_ROLES = {'main': {'resident', 'concierge', 'management', 'guest', 'cleaner'}, 'common': {'concierge', 'management', 'cleaner'}}
+
 def account_status_error(user):
     if not user.is_active:
         return "account inactive"
     if user.is_locked:
         return "account locked"
+    if user.role == 'guest' and (not user.access_expires_at or user.access_expires_at < datetime.utcnow()):
+        return "guest access expired"
     return None
 
 # Helper functions for password and username generation
@@ -260,13 +265,8 @@ def request_access():
     proximity_ok = bool(proximity)
 
     # Determine if user is allowed by role/unit
-    permission = False
-    if door.door_type == 'main' and user.role in ['resident', 'concierge', 'management']:
-        permission = True
-    elif door.door_type == 'unit' and door.associated_unit == user.unit_number:
-        permission = True
-    elif door.door_type == 'common' and user.role in ['concierge', 'management']:
-        permission = True
+    permission = user.role in DOOR_ROLES.get(door.door_type, set()) or (
+        door.door_type == 'unit' and user.role == 'resident' and door.associated_unit == user.unit_number)
 
     # Zone check
     zone_ok = True
@@ -511,7 +511,7 @@ def recent_users_api():
 @login_required
 @role_required('management', 'concierge')
 def users_list():
-    query = User.query if session['user_role'] == 'management' else User.query.filter_by(role='resident')
+    query = User.query if session['user_role'] == 'management' else User.query.filter(User.role.in_(CREATABLE_ROLES['concierge']))
     return render_template("users.html", users=query.all())
 
 @web_bp.route("/users/toggle/<int:user_id>", methods=["POST"])
@@ -574,7 +574,7 @@ def list_doors():
 @role_required('management', 'concierge')
 def create_user():
     current_user_role = session.get('user_role')
-    allowed_roles = ['resident'] if current_user_role == 'concierge' else ['concierge', 'resident']
+    allowed_roles = CREATABLE_ROLES[current_user_role]
 
     if request.method == "GET":
         return render_template("create_user.html", allowed_roles=allowed_roles)
@@ -593,12 +593,17 @@ def create_user():
     if User.query.filter_by(email=email).first():
         return render_template("create_user.html", error="User already exists", allowed_roles=allowed_roles)
 
-    if current_user_role == 'concierge' and role != 'resident':
-        return render_template(
-            "create_user.html",
-            error="Concierge can only create resident accounts",
-            allowed_roles=['resident']
-        )
+    if role not in allowed_roles:
+        return render_template("create_user.html", error=f"You can't create {role} accounts", allowed_roles=allowed_roles)
+
+    access_expires_at = None
+    if role == 'guest':
+        try:
+            access_expires_at = datetime.strptime(request.form.get("access_expires_at", ""), '%Y-%m-%d') + timedelta(hours=23, minutes=59, seconds=59)
+        except ValueError:
+            return render_template("create_user.html", error="Guests need an access end date", allowed_roles=allowed_roles)
+        if access_expires_at < datetime.utcnow():
+            return render_template("create_user.html", error="The access end date must be in the future", allowed_roles=allowed_roles)
 
     password = generate_password()
     username = generate_username(first_name, last_name)
@@ -647,7 +652,8 @@ def create_user():
         unit_number=unit_number,
         floor=floor,
         door_code=door_code,
-        door_id=unit_door.id if unit_door else None
+        door_id=unit_door.id if unit_door else None,
+        access_expires_at=access_expires_at
     )
     user.set_password(password)
 
@@ -670,7 +676,8 @@ def create_user():
         "temp_password": password,
         "unit_number": unit_number,
         "door_code": door_code,
-        "floor": floor
+        "floor": floor,
+        "access_expires_at": access_expires_at
     }
 
     return render_template(
@@ -737,7 +744,7 @@ def reset_password_with_token(token):
 
 @web_bp.route("/simulate")
 @login_required
-@role_required('resident')
+@role_required('resident', 'guest', 'cleaner')
 def simulate():
     user_id = session.get('user_id')
     user = User.query.get(user_id)
@@ -754,6 +761,8 @@ def simulate():
         door_code=user.door_code,
         unit_door_id=user.door_id,          # from the user's door relation
         main_door_id=main_door_id,
+        role=user.role,
+        access_expires_at=user.access_expires_at,
         jwt_token=session.get("jwt_token")
     )
 
@@ -802,8 +811,8 @@ def reset_password():
     if new_password != confirm_password:
         return render_template("reset_password.html", error="New passwords don't match")
     
-    if len(new_password) < 6:
-        return render_template("reset_password.html", error="Password must be at least 6 characters")
+    if len(new_password) < 8:
+        return render_template("reset_password.html", error="Password must be at least 8 characters")
     
     user_id = session.get('user_id')
     user = User.query.get(user_id)

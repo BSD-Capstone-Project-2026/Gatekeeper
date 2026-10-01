@@ -1,107 +1,110 @@
 {% extends "base.html" %}
 
-{% block title %}Access Simulation{% endblock %}
+{% block title %}Access - Gatekeeper{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2 class="mt-4">🏢 Access Simulation – Unit {{ unit }} (Floor {{ floor }})</h2>
-    <div id="offline-banner" class="alert alert-danger mt-3 d-none" role="alert">
-        <strong>System offline.</strong> The building server cannot be reached, so doors and the elevator are unavailable. Retrying automatically.
-    </div>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-2 sidebar p-0">
+            {% include "_sidebar.html" %}
+        </div>
+        <div class="col-md-10 p-4">
+            <h2 class="mb-1">Access</h2>
+            <p class="text-muted mb-4">{% if unit %}Unit {{ unit }} · Floor {{ floor }}{% else %}{{ role|title }} access{% endif %}{% if access_expires_at %} · Valid until {{ access_expires_at.strftime('%b %d, %Y') }}{% endif %}</p>
 
-    <div class="row mt-5">
-        <!-- Main Entrance Door -->
-        <div class="col-md-4 text-center">
-            <div class="card p-3">
-                <div class="display-1">🚪</div>
-                <h4>Main Entrance</h4>
-                <div id="main-door-status" class="badge bg-danger p-2 mt-2">🔒 CLOSED</div>
+            <div id="offline-banner" class="alert alert-danger d-none" role="alert">
+                <strong>System offline.</strong> The building server cannot be reached, so doors and the elevator are unavailable. Retrying automatically.
             </div>
-        </div>
-        
-        <!-- Elevator -->
-        <div class="col-md-4 text-center">
-            <div class="card p-3">
-                <div class="display-1">🛗</div>
-                <h4>Elevator</h4>
-                <div>Current floor: <span id="elevator-current">1</span></div>
-                <div>Target: <span id="elevator-target">{{ floor }}</span></div>
-                <div id="elevator-status" class="badge bg-secondary mt-2">⏳ Idle</div>
+
+            <div class="row g-3">
+                <div class="col-12 col-md-4">
+                    <div class="card access-tile h-100">
+                        <div class="card-body">
+                            <div class="access-icon"><i class="bi bi-building"></i></div>
+                            <h5 class="mb-0">Main Entrance</h5>
+                            <span id="main-door-status" class="badge bg-secondary">Locked</span>
+                            <button class="btn btn-primary btn-lg access-btn" onclick="unlockDoor(MAIN_DOOR_ID, 'main-door-status', 'Main entrance')">Unlock</button>
+                        </div>
+                    </div>
+                </div>
+
+                {% if role == 'resident' %}
+                <div class="col-12 col-md-4">
+                    <div class="card access-tile h-100">
+                        <div class="card-body">
+                            <div class="access-icon"><i class="bi bi-arrow-down-up"></i></div>
+                            <h5 class="mb-0">Elevator</h5>
+                            <span class="text-muted small">Floor <span id="elevator-current">1</span> → {{ floor or 1 }}</span>
+                            <span id="elevator-status" class="badge bg-secondary">Idle</span>
+                            <button class="btn btn-secondary btn-lg access-btn" onclick="callElevator()">Call Elevator</button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if unit_door_id %}
+                <div class="col-12 col-md-4">
+                    <div class="card access-tile h-100">
+                        <div class="card-body">
+                            <div class="access-icon"><i class="bi bi-door-closed"></i></div>
+                            <h5 class="mb-0">Unit {{ unit }}</h5>
+                            <span id="unit-door-status" class="badge bg-secondary">Locked</span>
+                            <button class="btn btn-primary btn-lg access-btn" onclick="unlockDoor(UNIT_DOOR_ID, 'unit-door-status', 'Unit door')">Unlock</button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
-        </div>
-        
-        <!-- Unit Door -->
-        <div class="col-md-4 text-center">
-            <div class="card p-3">
-                <div class="display-1">🚪</div>
-                <h4>Your Unit Door</h4>
-                <div id="unit-door-status" class="badge bg-danger p-2 mt-2">🔒 CLOSED</div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="row mt-4">
-        <div class="col text-center">
-            <button class="btn btn-primary btn-lg me-2 access-btn" onclick="unlockMainDoor()">Unlock Main Door</button>
-            <button class="btn btn-warning btn-lg me-2 access-btn" onclick="callElevator()">Call Elevator</button>
-            <button class="btn btn-success btn-lg access-btn" onclick="unlockUnitDoor()">Unlock Unit Door</button>
-        </div>
-    </div>
-    
-    <!-- Log Panel -->
-    <div class="row mt-5">
-        <div class="col">
-            <div class="card">
-                <div class="card-header">Access Log</div>
-                <div class="card-body" style="max-height: 200px; overflow-y: auto;" id="log-panel">
-                    <p class="text-muted">No events yet</p>
+
+            <div class="card mt-4">
+                <div class="card-header">Activity</div>
+                <div class="card-body activity-log" id="log-panel">
+                    <p class="text-muted mb-0" id="log-empty">No activity yet</p>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Wi‑Fi Input (simulated) -->
-    <div class="row mt-3">
-        <div class="col text-center">
-            <label for="wifiInput" class="form-label">Your current Wi‑Fi (simulated):</label>
-            <input type="text" id="wifiInput" class="form-control d-inline-block w-auto" placeholder="Enter SSID" value="Avengers-x">
-            <button class="btn btn-sm btn-secondary" onclick="updateWifi()">Update</button>
+            <details class="card mt-3 settings">
+                <summary class="card-body text-muted">Simulation settings</summary>
+                <div class="card-body pt-0 row g-3 align-items-end">
+                    <div class="col-12 col-sm-6">
+                        <label for="wifiInput" class="form-label">Connected Wi-Fi</label>
+                        <input type="text" id="wifiInput" class="form-control" value="Avengers-x">
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="nearDoor" checked>
+                            <label class="form-check-label" for="nearDoor">Near the door</label>
+                        </div>
+                    </div>
+                </div>
+            </details>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    const jwtToken = "{{ jwt_token }}";
-    const MAIN_DOOR_ID = {{ main_door_id }};
-    const UNIT_DOOR_ID = {{ unit_door_id }};
-    const BUILDING_WIFI = "Avengers-x";   // the expected building Wi‑Fi
-
-    // Read the current value from the input field
-    function getWifi() {
-        const input = document.getElementById('wifiInput');
-        return input ? input.value : BUILDING_WIFI;
-    }
-
-    // Optional: log the current value (or you can just rely on getWifi)
-    function updateWifi() {
-        const val = getWifi();
-        log(`Wi‑Fi set to: ${val}`, 'info');
-    }
-
-    function log(message, type = 'info') {
-        const logPanel = document.getElementById('log-panel');
-        // Remove the placeholder if it exists
-        const empty = logPanel.querySelector('.text-muted');
-        if (empty && empty.innerText === 'No events yet') empty.remove();
-        const entry = document.createElement('p');
-        entry.className = type === 'success' ? 'text-success' : (type === 'error' ? 'text-danger' : '');
-        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-        logPanel.appendChild(entry);
-        logPanel.scrollTop = logPanel.scrollHeight;
-    }
-    
+    const jwtToken = {{ jwt_token|tojson }};
+    const MAIN_DOOR_ID = {{ main_door_id|tojson }};
+    const UNIT_DOOR_ID = {{ unit_door_id|tojson }};
+    const TARGET_FLOOR = {{ (floor or 1)|tojson }};
     const REQUEST_TIMEOUT_MS = 5000;
     const HEALTH_POLL_MS = 10000;
+
+    function log(message, tone) {
+        document.getElementById('log-empty')?.remove();
+        const entry = document.createElement('div');
+        entry.className = 'activity-entry' + (tone ? ' text-' + tone : '');
+        entry.textContent = `${new Date().toLocaleTimeString()} · ${message}`;
+        document.getElementById('log-panel').prepend(entry);
+    }
+
+    function setStatus(id, text, tone) {
+        const badge = document.getElementById(id);
+        badge.className = `badge bg-${tone}`;
+        badge.textContent = text;
+    }
 
     function setOffline(offline) {
         document.getElementById('offline-banner').classList.toggle('d-none', !offline);
@@ -123,7 +126,7 @@
             return response;
         } catch (err) {
             setOffline(true);
-            log('⚠️ Server unreachable. Check your connection to the building network.', 'error');
+            log('Server unreachable. Check your connection to the building network.', 'danger');
             return null;
         }
     }
@@ -137,82 +140,51 @@
         }
     }
 
-    checkHealth();
-    setInterval(checkHealth, HEALTH_POLL_MS);
+    async function unlockDoor(doorId, statusId, label) {
+        log(`Unlocking ${label.toLowerCase()}…`);
+        const res = await callAPI('/api/access/request', {
+            door_id: doorId,
+            wifi_ssid: document.getElementById('wifiInput').value,
+            proximity: document.getElementById('nearDoor').checked
+        });
+        if (!res) return;
+        const data = await res.json();
+        if (res.ok) {
+            setStatus(statusId, 'Unlocked', 'success');
+            log(`${label} unlocked`, 'success');
+        } else {
+            setStatus(statusId, 'Denied', 'danger');
+            log(`${label} denied: ${data.error || 'Unknown error'}`, 'danger');
+        }
+    }
 
-    async function unlockMainDoor() {
-        log('Attempting to unlock main door...');
-        const wifi_ssid = getWifi();
-        const res = await callAPI('/api/access/request', {
-            door_id: MAIN_DOOR_ID,
-            wifi_ssid: wifi_ssid,
-            proximity: true
-        });
-        if (!res) return;
-        const data = await res.json();
-        if (res.ok) {
-            document.getElementById('main-door-status').className = 'badge bg-success p-2 mt-2';
-            document.getElementById('main-door-status').innerHTML = '🔓 OPEN';
-            log('✅ Main door opened', 'success');
-        } else {
-            document.getElementById('main-door-status').className = 'badge bg-danger p-2 mt-2';
-            document.getElementById('main-door-status').innerHTML = '🔒 CLOSED';
-            log(`❌ Access denied: ${data.error || 'Unknown error'}`, 'error');
-        }
-    }
-    
-    async function unlockUnitDoor() {
-        log('Attempting to unlock unit door...');
-        const wifi_ssid = getWifi();
-        const res = await callAPI('/api/access/request', {
-            door_id: UNIT_DOOR_ID,
-            wifi_ssid: wifi_ssid,
-            proximity: true
-        });
-        if (!res) return;
-        const data = await res.json();
-        if (res.ok) {
-            document.getElementById('unit-door-status').className = 'badge bg-success p-2 mt-2';
-            document.getElementById('unit-door-status').innerHTML = '🔓 OPEN';
-            log('✅ Unit door opened', 'success');
-        } else {
-            document.getElementById('unit-door-status').className = 'badge bg-danger p-2 mt-2';
-            document.getElementById('unit-door-status').innerHTML = '🔒 CLOSED';
-            log(`❌ Access denied: ${data.error || 'Unknown error'}`, 'error');
-        }
-    }
-    
     async function callElevator() {
-        log('Calling elevator...');
-        document.getElementById('elevator-status').className = 'badge bg-warning mt-2';
-        document.getElementById('elevator-status').innerHTML = '⏳ Moving';
-        
+        log('Calling elevator…');
+        setStatus('elevator-status', 'Moving', 'warning');
         const res = await callAPI('/api/access/elevator/call', {});
         if (!res) {
-            document.getElementById('elevator-status').className = 'badge bg-secondary mt-2';
-            document.getElementById('elevator-status').innerHTML = '⏳ Idle';
+            setStatus('elevator-status', 'Idle', 'secondary');
             return;
         }
         const data = await res.json();
-        if (res.ok) {
-            let current = 1;
-            const target = parseInt("{{ floor | default(1) }}");
-            const interval = setInterval(() => {
-                if (current < target) {
-                    current++;
-                    document.getElementById('elevator-current').innerText = current;
-                } else {
-                    clearInterval(interval);
-                    document.getElementById('elevator-status').className = 'badge bg-success mt-2';
-                    document.getElementById('elevator-status').innerHTML = '✅ Arrived';
-                    log(`✅ Elevator arrived at floor ${target}`, 'success');
-                }
-            }, 500);
-        } else {
-            document.getElementById('elevator-status').className = 'badge bg-danger mt-2';
-            document.getElementById('elevator-status').innerHTML = '❌ Failed';
-            log(`❌ Elevator call failed: ${data.error || 'Unknown error'}`, 'error');
+        if (!res.ok) {
+            setStatus('elevator-status', 'Unavailable', 'danger');
+            log(`Elevator call failed: ${data.error || 'Unknown error'}`, 'danger');
+            return;
         }
+        let current = 1;
+        const interval = setInterval(() => {
+            if (current < TARGET_FLOOR) {
+                document.getElementById('elevator-current').textContent = ++current;
+            } else {
+                clearInterval(interval);
+                setStatus('elevator-status', 'Arrived', 'success');
+                log(`Elevator arrived at floor ${TARGET_FLOOR}`, 'success');
+            }
+        }, 500);
     }
+
+    checkHealth();
+    setInterval(checkHealth, HEALTH_POLL_MS);
 </script>
 {% endblock %}

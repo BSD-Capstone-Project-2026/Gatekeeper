@@ -41,6 +41,7 @@ class User(db.Model, UserMixin):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     door_id = db.Column(db.Integer, db.ForeignKey('doors.id'), nullable=True)
     unit_door = db.relationship('Door', foreign_keys=[door_id], uselist=False)
+    access_expires_at = db.Column(db.DateTime, nullable=True)
 
     # Login security fields
     failed_login_attempts = db.Column(db.Integer, default=0)

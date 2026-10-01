@@ -72,21 +72,23 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 
 ## Role Permissions
 
-| Route | Management | Concierge | Resident |
-|-------|:---:|:---:|:---:|
-| `/dashboard` (stats, chart, recent users) | ✅ | ✅ | Health only |
-| `/api/dashboard/stats`, `/api/dashboard/recent-users` | ✅ | ✅ | ❌ |
-| `/concierge`, `/api/recent-logs` (live door activity) | ✅ | ✅ | ❌ |
-| `/door-controls`, `/doors/<id>/lock`, `/doors/<id>/unlock` (POST) | ✅ | ✅ | ❌ |
-| `/users` | All users | Residents only | ❌ |
-| `/create-user` | Concierge, Resident | Resident | ❌ |
-| `/users/toggle/<id>`, `/unlock-user/<id>` (POST) | ✅ | ❌ | ❌ |
-| `/users/<id>/zones`, `/zones/*`, `/doors/*` | ✅ | ❌ | ❌ |
-| `/incident-list`, `/incidents/<id>/acknowledge` (POST) | ✅ | ✅ | ❌ |
-| `/incidents`, `/incidents/<id>`, `/audit` | ✅ | ❌ | ❌ |
-| `/emergency-override`, `/logs/verify` | ✅ | ❌ | ❌ |
-| `/simulate` | ❌ | ❌ | ✅ |
-| `/profile`, `/profile/incidents`, `/reset-password` | ✅ | ✅ | ✅ |
+| Route | Management | Concierge | Resident | Guest / Cleaner |
+|-------|:---:|:---:|:---:|:---:|
+| `/dashboard` (stats, chart, recent users) | ✅ | ✅ | Health only | Health only |
+| `/api/dashboard/stats`, `/api/dashboard/recent-users` | ✅ | ✅ | ❌ | ❌ |
+| `/concierge`, `/api/recent-logs` (live door activity) | ✅ | ✅ | ❌ | ❌ |
+| `/door-controls`, `/doors/<id>/lock`, `/doors/<id>/unlock` (POST) | ✅ | ✅ | ❌ | ❌ |
+| `/users` | All users | Residents and guests | ❌ | ❌ |
+| `/create-user` | Concierge, Resident, Guest, Cleaner | Resident, Guest | ❌ | ❌ |
+| `/users/toggle/<id>`, `/unlock-user/<id>` (POST) | ✅ | ❌ | ❌ | ❌ |
+| `/users/<id>/zones`, `/zones/*`, `/doors/*` | ✅ | ❌ | ❌ | ❌ |
+| `/incident-list`, `/incidents/<id>/acknowledge` (POST) | ✅ | ✅ | ❌ | ❌ |
+| `/incidents`, `/incidents/<id>`, `/audit` | ✅ | ❌ | ❌ | ❌ |
+| `/emergency-override`, `/logs/verify` | ✅ | ❌ | ❌ | ❌ |
+| `/simulate` | ❌ | ❌ | ✅ | ✅ |
+| `/profile`, `/profile/incidents`, `/reset-password` | ✅ | ✅ | ✅ | ✅ |
+
+**Door rights:** main entrance for every role; common doors for management, concierge and cleaners; unit doors only for the resident of that unit. Zone rules apply on top. Guest access ends on the date set at creation.
 
 Denied requests return `403` and are recorded in the audit log as `access_denied`.
 
@@ -114,6 +116,24 @@ python app.py
 ```
 
 Then open `http://localhost:5000` in your browser. The database is created and seeded in `instance/` on first run.
+
+### Demo Data
+
+Seed a realistic building for class demos (development only, safe to run more than once):
+
+```bash
+python scripts/seed_demo.py
+```
+
+It adds floors 2–6 with units A and B, one resident per unit, common doors (gym, amenities, rooftop) with zones, a week of access history, an open incident and a resident notification. Every demo account uses the password in `DEMO_SEED_PASSWORD` (default `Demo@2026`).
+
+| Role | Email |
+|------|-------|
+| Management | `maya.chen@gatekeeper.demo`, `daniel.okafor@gatekeeper.demo` |
+| Concierge | `priya.sharma@gatekeeper.demo`, `lucas.martin@gatekeeper.demo` |
+| Resident | `aisha.khan@gatekeeper.demo` (unit 2A) … `jamal.brooks@gatekeeper.demo` (unit 6B) |
+| Guest | `oliver.grant@gatekeeper.demo` (access for 7 days) |
+| Cleaner | `rosa.diaz@gatekeeper.demo` |
 
 ### Backup and Restore
 

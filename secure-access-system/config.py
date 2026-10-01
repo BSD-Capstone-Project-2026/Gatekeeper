@@ -12,6 +12,7 @@ DEV_ENCRYPTION_KEY = "FIUm535S2jS40e-Qi4BG6W3aiL_yKA5v6xWgquo9iTY="
 
 
 class Config:
+    APP_ENV = APP_ENV
     ENCRYPTION_KEY = os.environ.get("ENCRYPTION_KEY", None if APP_ENV == "production" else DEV_ENCRYPTION_KEY)
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-secret-key-change-in-env-file")
 

@@ -381,6 +381,97 @@ hr {
     opacity: 1;
 }
 
+.text-success { color: var(--app-green-text) !important; }
+.text-danger { color: var(--app-red-text) !important; }
+.text-warning { color: var(--app-orange-text) !important; }
+
+.access-tile .card-body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1.5rem;
+}
+
+.access-icon {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: rgba(var(--bs-primary-rgb), 0.12);
+    color: var(--app-accent);
+    font-size: 1.6rem;
+}
+
+.access-tile .btn {
+    width: 100%;
+    min-height: 44px;
+    margin-top: auto;
+}
+
+.activity-log {
+    max-height: 240px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+}
+
+.activity-entry {
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--app-separator);
+}
+
+.activity-entry:last-child {
+    border-bottom: 0;
+}
+
+details.settings summary {
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.auth-page {
+    display: grid;
+    place-items: center;
+    min-height: 100vh;
+    padding: 1.5rem;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 400px;
+}
+
+.auth-card .card-body {
+    padding: 2.5rem 2rem;
+}
+
+.auth-logo {
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1.25rem;
+    border-radius: 18px;
+    background: var(--app-accent);
+    color: #ffffff;
+    font-size: 2rem;
+}
+
+.auth-title {
+    margin-bottom: 0.35rem;
+    font-size: 1.5rem;
+    text-align: center;
+}
+
+.auth-hint {
+    font-size: 0.8rem;
+}
+
+.account-card {
+    max-width: 520px;
+}
+
 @media (max-width: 767.98px) {
     .sidebar {
         min-height: auto;
