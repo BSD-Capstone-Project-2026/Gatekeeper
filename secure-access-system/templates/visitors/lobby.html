@@ -19,7 +19,7 @@
 <div class="control-grid mb-2">
     {% for target, icon, label, hint in [('door', 'door-open', 'Lobby Door', 'Unlock the main entrance'), ('elevator', 'arrow-down-up', 'Elevator', 'Send it to the lobby')] %}
     <form method="POST" action="{{ url_for('visitors.lobby_control', target=target) }}">
-        <button class="control-tile" type="submit" {{ 'disabled' if not host_pass }}>
+        <button class="control-tile" type="submit" {{ 'disabled' if not host_pass or not on_network }}>
             <span class="control-icon"><i class="bi bi-{{ icon }}"></i></span>
             <span class="control-label">{{ label }}</span>
             <span class="control-hint">{{ hint }}</span>
@@ -27,7 +27,7 @@
     </form>
     {% endfor %}
 </div>
-<p class="text-muted small mb-4">{% if host_pass %}<i class="bi bi-person-check me-1"></i>{{ host_pass.visitor_name }} was checked in at the front desk · pass valid until <time data-local datetime="{{ host_pass.valid_until.isoformat() }}Z"></time>{% elif waiting_pass %}<i class="bi bi-info-circle me-1"></i>{{ waiting_pass.visitor_name }}'s pass is active. These unlock once the front desk checks {{ waiting_pass.visitor_name }} in at Pass Check.{% else %}Available while one of your visitors is checked in at the front desk with an active pass.{% endif %}</p>
+<p class="text-muted small mb-4">{% if not on_network %}<i class="bi bi-wifi-off me-1"></i>Connect to the building Wi-Fi to use these controls, the same as the Access page.{% elif host_pass %}<i class="bi bi-person-check me-1"></i>{{ host_pass.visitor_name }} was checked in at the front desk · pass valid until <time data-local datetime="{{ host_pass.valid_until.isoformat() }}Z"></time>{% elif waiting_pass %}<i class="bi bi-info-circle me-1"></i>{{ waiting_pass.visitor_name }}'s pass is active. These unlock once the front desk checks {{ waiting_pass.visitor_name }} in at Pass Check.{% else %}Available while one of your visitors is checked in at the front desk with an active pass.{% endif %}</p>
 {% endif %}
 
 <h6 class="section-title">Waiting now</h6>

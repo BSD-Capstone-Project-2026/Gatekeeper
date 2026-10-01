@@ -120,3 +120,12 @@ def test_controls_end_when_pass_expires_or_is_revoked(client, unit_2a, make_user
     assert client.post("/visitors/lobby/door").status_code == 403
     checked_in(unit_2a, minutes_left=-1, code="OTHER")
     assert client.post("/visitors/lobby/elevator").status_code == 403
+
+
+def test_controls_need_building_wifi(app, client, unit_2a, login):
+    checked_in(unit_2a)
+    login(unit_2a)
+    app.config["BUILDING_NETWORKS"] = ["10.0.0.0/8"]
+    assert "Connect to the building Wi-Fi" in client.get("/visitors/lobby").data.decode()
+    assert client.post("/visitors/lobby/door").status_code == 403
+    assert client.post("/visitors/lobby/elevator").status_code == 403

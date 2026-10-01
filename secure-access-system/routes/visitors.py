@@ -8,6 +8,7 @@ from flask import Blueprint, Response, abort, jsonify, redirect, render_template
 from models import db, AccessLog, AuditLog, Door, EntryRequest, ParkingPermit, User, VisitorPass, WatchlistEntry
 from routes.decorators import role_required
 from routes.web import login_required
+from utils.proximity import on_building_network
 
 visitors_bp = Blueprint("visitors", __name__)
 
@@ -245,7 +246,7 @@ def lobby():
         pending = pending_for_unit(unit)
         history = EntryRequest.query.filter_by(unit_number=unit).order_by(EntryRequest.created_at.desc()).limit(10).all()
     return render_template("visitors/lobby.html", pending=pending, history=history,
-                           host_pass=checked_in_pass(session['user_id']), done=request.args.get("done"),
+                           host_pass=checked_in_pass(session['user_id']), done=request.args.get("done"), on_network=on_building_network(request.remote_addr),
                            waiting_pass=valid_passes(session['user_id']).filter(VisitorPass.checked_in_at.is_(None)).first())
 
 
@@ -265,7 +266,7 @@ def checked_in_pass(resident_id):
 def lobby_control(target):
     resident = current_user()
     visitor_pass = checked_in_pass(resident.id)
-    if not visitor_pass:
+    if not visitor_pass or not on_building_network(request.remote_addr):
         abort(403)
     if target == 'door':
         record_visitor_entry(resident, visitor_pass.visitor_name, True)
