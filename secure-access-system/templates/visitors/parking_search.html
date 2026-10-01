@@ -1,0 +1,63 @@
+{% extends "visitors/_layout.html" %}
+{% block title %}Visitor Parking - Gatekeeper{% endblock %}
+{% block heading %}Visitors{% endblock %}
+{% block description %}Check whether a car in visitor parking has a permit and which unit registered it.{% endblock %}
+
+{% block tab %}
+<div class="row g-4">
+    <div class="col-lg-6">
+        <form class="card" method="GET" action="{{ url_for('visitors.parking') }}">
+            <div class="card-body">
+                <label class="form-label" for="plate">Licence plate</label>
+                <input class="form-control plate-input" id="plate" name="plate" value="{{ search }}" maxlength="12" placeholder="ABCD 123" autocomplete="off" autofocus required>
+                <button class="btn btn-primary btn-lg w-100 mt-3" type="submit">Search</button>
+            </div>
+        </form>
+
+        {% if search %}
+        {% set current_match = matches|selectattr('is_active')|first %}
+        {% if current_match %}
+        <div class="result-card is-ok mt-3" role="status">
+            <i class="bi bi-check-circle-fill"></i>
+            <div>
+                <div class="result-title">Active permit</div>
+                <div class="result-detail">{{ current_match.plate }} · Unit {{ current_match.resident.unit_number or '—' }} · until <time data-local datetime="{{ current_match.ends_at.isoformat() }}Z"></time></div>
+            </div>
+        </div>
+        {% elif matches %}
+        <div class="result-card is-denied mt-3" role="status">
+            <i class="bi bi-x-circle-fill"></i>
+            <div>
+                <div class="result-title">Permit expired</div>
+                <div class="result-detail">{{ matches[0].plate }} · Unit {{ matches[0].resident.unit_number or '—' }} · ended <time data-local datetime="{{ matches[0].ends_at.isoformat() }}Z"></time></div>
+            </div>
+        </div>
+        {% else %}
+        <div class="result-card is-denied mt-3" role="status">
+            <i class="bi bi-question-circle-fill"></i>
+            <div>
+                <div class="result-title">No permit found</div>
+                <div class="result-detail">No resident has registered {{ search|upper }}.</div>
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="col-lg-6">
+        <h6 class="section-title">Active now</h6>
+        <div class="card">
+            <ul class="list-group list-group-flush">
+                {% for p in current %}
+                <li class="list-group-item permit-row">
+                    <span class="plate">{{ p.plate }}</span>
+                    <div class="flex-grow-1"><div class="fw-semibold">Unit {{ p.resident.unit_number or '—' }}</div><small class="text-muted">Until <time data-local datetime="{{ p.ends_at.isoformat() }}Z"></time></small></div>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">No active permits.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

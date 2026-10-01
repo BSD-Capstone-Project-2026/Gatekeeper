@@ -325,3 +325,57 @@
 .kiosk-result.is-denied > i {
     color: rgb(var(--bs-danger-rgb));
 }
+
+.segmented-block {
+    display: flex;
+}
+
+.segmented-block .segmented-item {
+    flex: 1;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.btn-check:checked + .segmented-item {
+    background: var(--app-surface);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.plate-input {
+    min-height: 56px;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.plate-input::placeholder {
+    font-weight: 400;
+    opacity: 0.35;
+}
+
+.permit-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+}
+
+.permit-row.is-inactive {
+    opacity: 0.55;
+}
+
+.plate {
+    flex-shrink: 0;
+    min-width: 7.5rem;
+    padding: 0.35rem 0.6rem;
+    border: 2px solid var(--app-text);
+    border-radius: 8px;
+    background: var(--app-surface);
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-align: center;
+}

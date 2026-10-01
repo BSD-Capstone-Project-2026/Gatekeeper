@@ -9,7 +9,8 @@
 {% set staff = role in ['concierge', 'management'] %}
 {% set visitor_tabs = [
     ('visitors.passes', 'qr-code', 'Pass Check' if staff else 'Passes', True, ['visitors.passes', 'visitors.create_pass', 'visitors.check_pass']),
-    ('visitors.lobby', 'bell', 'Lobby', True, ['visitors.lobby'])
+    ('visitors.lobby', 'bell', 'Lobby', True, ['visitors.lobby']),
+    ('visitors.parking', 'car-front', 'Parking', True, ['visitors.parking', 'visitors.create_permit'])
 ] %}
 <nav class="segmented mb-4" aria-label="Visitors sections">
     {% for endpoint, icon, label, visible, matches in visitor_tabs if visible %}

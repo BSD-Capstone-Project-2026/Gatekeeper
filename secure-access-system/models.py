@@ -251,6 +251,26 @@ class EntryRequest(db.Model):
     def seconds_left(self):
         return max(0, int((self.expires_at - datetime.utcnow()).total_seconds()))
 
+class ParkingPermit(db.Model):
+    __tablename__ = 'parking_permits'
+
+    id = db.Column(db.Integer, primary_key=True)
+    resident_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    plate = db.Column(db.String(12), nullable=False)
+    plate_key = db.Column(db.String(12), nullable=False, index=True)
+    starts_at = db.Column(db.DateTime, default=datetime.utcnow)
+    ends_at = db.Column(db.DateTime, nullable=False)
+
+    resident = db.relationship('User')
+
+    @property
+    def is_active(self):
+        return datetime.utcnow() < self.ends_at
+
+    @property
+    def minutes_left(self):
+        return max(0, int((self.ends_at - datetime.utcnow()).total_seconds() // 60))
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 

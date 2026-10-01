@@ -1,0 +1,51 @@
+{% extends "visitors/_layout.html" %}
+{% block title %}Visitor Parking - Gatekeeper{% endblock %}
+{% block heading %}Visitors{% endblock %}
+{% block description %}Register your visitor's licence plate so they can use visitor parking without a ticket.{% endblock %}
+
+{% block tab %}
+<div class="row g-4">
+    <div class="col-lg-5">
+        <form class="card" method="POST" action="{{ url_for('visitors.create_permit') }}">
+            <div class="card-body">
+                <h5 class="mb-3">Register a plate</h5>
+                <label class="form-label" for="plate">Licence plate</label>
+                <input class="form-control plate-input" id="plate" name="plate" maxlength="12" placeholder="ABCD 123" autocomplete="off" required>
+                <div class="form-label mt-3">How long</div>
+                <div class="segmented segmented-block" role="radiogroup" aria-label="Permit length">
+                    {% for h in hours %}
+                    <input class="btn-check" type="radio" name="hours" id="hours-{{ h }}" value="{{ h }}" {{ 'checked' if loop.first }}>
+                    <label class="segmented-item" for="hours-{{ h }}">{{ h }} hours</label>
+                    {% endfor %}
+                </div>
+                <button class="btn btn-primary btn-lg w-100 mt-4" type="submit">Register</button>
+                <p class="text-muted small mt-2 mb-0">You can have up to {{ limit }} active permits at a time.</p>
+            </div>
+        </form>
+    </div>
+
+    <div class="col-lg-7">
+        <h6 class="section-title">Your permits</h6>
+        <div class="card">
+            <ul class="list-group list-group-flush">
+                {% for p in permits %}
+                <li class="list-group-item permit-row{{ ' is-inactive' if not p.is_active }}">
+                    <span class="plate">{{ p.plate }}</span>
+                    <div class="flex-grow-1">
+                        {% if p.is_active %}
+                        <div class="fw-semibold">{{ p.minutes_left // 60 }} h {{ p.minutes_left % 60 }} min left</div>
+                        {% else %}
+                        <div class="fw-semibold">Expired</div>
+                        {% endif %}
+                        <small class="text-muted">Until <time data-local datetime="{{ p.ends_at.isoformat() }}Z"></time></small>
+                    </div>
+                    <span class="badge {{ 'bg-success' if p.is_active else 'bg-secondary' }}">{{ 'Active' if p.is_active else 'Expired' }}</span>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">No permits yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -5,7 +5,7 @@ import qrcode
 import qrcode.image.svg
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 
-from models import db, AccessLog, Door, EntryRequest, User, VisitorPass
+from models import db, AccessLog, Door, EntryRequest, ParkingPermit, User, VisitorPass
 from routes.decorators import role_required
 from routes.web import login_required
 
@@ -15,6 +15,8 @@ STAFF = ('concierge', 'management')
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 MAX_PASS_DAYS = 7
 LOBBY_REQUEST_SECONDS = 120
+PERMIT_HOURS = (2, 4, 24)
+MAX_ACTIVE_PERMITS = 2
 
 
 def current_user():
@@ -221,3 +223,41 @@ def decide_lobby(request_id, decision):
         if decision == 'approve':
             record_visitor_entry(resident, entry.visitor_name, True)
     return redirect(url_for("visitors.lobby"))
+
+
+def plate_key(plate):
+    return "".join(ch for ch in (plate or "").upper() if ch.isalnum())
+
+
+def active_permits(query):
+    return query.filter(ParkingPermit.ends_at > datetime.utcnow())
+
+
+@visitors_bp.route("/visitors/parking")
+@login_required
+@role_required('resident', *STAFF)
+def parking(error=None, status=200):
+    if session['user_role'] in STAFF:
+        search = request.args.get("plate", "")
+        matches = ParkingPermit.query.filter_by(plate_key=plate_key(search)).order_by(ParkingPermit.ends_at.desc()).all() if search else []
+        current = active_permits(ParkingPermit.query).order_by(ParkingPermit.ends_at).all()
+        return render_template("visitors/parking_search.html", search=search, matches=matches, current=current)
+    permits = ParkingPermit.query.filter_by(resident_id=session['user_id']).order_by(ParkingPermit.ends_at.desc()).limit(10).all()
+    return render_template("visitors/parking.html", permits=permits, hours=PERMIT_HOURS, limit=MAX_ACTIVE_PERMITS, error=error), status
+
+
+@visitors_bp.route("/visitors/parking", methods=["POST"])
+@login_required
+@role_required('resident')
+def create_permit():
+    plate = " ".join((request.form.get("plate") or "").upper().split())[:12]
+    hours = request.form.get("hours", type=int)
+    if not plate_key(plate) or hours not in PERMIT_HOURS:
+        return parking(error="Enter a licence plate and choose how long the visitor will stay.", status=400)
+    if active_permits(ParkingPermit.query.filter_by(resident_id=session['user_id'])).count() >= MAX_ACTIVE_PERMITS:
+        return parking(error=f"Limit of {MAX_ACTIVE_PERMITS} active permits reached", status=400)
+    now = datetime.utcnow()
+    db.session.add(ParkingPermit(resident_id=session['user_id'], plate=plate, plate_key=plate_key(plate),
+                                 starts_at=now, ends_at=now + timedelta(hours=hours)))
+    db.session.commit()
+    return redirect(url_for("visitors.parking"))
