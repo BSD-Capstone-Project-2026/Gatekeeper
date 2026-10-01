@@ -125,7 +125,7 @@ def login():
 @web_bp.route("/dashboard")
 @login_required
 def dashboard():
-    users = User.query.order_by(User.created_at.desc()).all()
+    users = User.query.order_by(User.created_at.desc()).all() if session.get('user_role') in ('management', 'concierge') else []
     total_users = User.query.count()
     active_users = User.query.filter_by(is_active=True).count()
     locked_users = User.query.filter_by(is_locked=True).count()
@@ -360,10 +360,23 @@ def incident_view(incident_id):
 
 @web_bp.route("/incident-list")
 @login_required
-@role_required('management')
+@role_required('management', 'concierge')
 def incident_list():
     incidents = Incident.query.order_by(Incident.created_at.desc()).all()
-    return render_template("incident_list.html", incidents=incidents)
+    open_count = sum(1 for i in incidents if i.status == 'open')
+    return render_template("incident_list.html", incidents=incidents, open_count=open_count)
+
+@web_bp.route("/incidents/<int:incident_id>/acknowledge", methods=["POST"])
+@login_required
+@role_required('management', 'concierge')
+def acknowledge_incident(incident_id):
+    incident = Incident.query.get_or_404(incident_id)
+    if incident.status == 'open':
+        incident.status = 'acknowledged'
+        incident.acknowledged_by = session['user_id']
+        incident.acknowledged_at = datetime.utcnow()
+        db.session.commit()
+    return redirect(url_for("web.incident_list"))
 
 @web_bp.route("/emergency-override", methods=["GET", "POST"])
 @login_required
@@ -408,6 +421,7 @@ def emergency_override():
 # API endpoints for dashboard
 @web_bp.route("/api/dashboard/stats")
 @login_required
+@role_required('management', 'concierge')
 def dashboard_stats():
     week_ago = datetime.utcnow() - timedelta(days=7)
     return jsonify({
@@ -422,6 +436,7 @@ def dashboard_stats():
 
 @web_bp.route("/api/dashboard/recent-users")
 @login_required
+@role_required('management', 'concierge')
 def recent_users_api():
     users = User.query.order_by(User.created_at.desc()).limit(5).all()
     result = []
@@ -443,11 +458,12 @@ def recent_users_api():
 
 @web_bp.route("/users")
 @login_required
+@role_required('management', 'concierge')
 def users_list():
-    users = User.query.all()
-    return render_template("users.html", users=users)
+    query = User.query if session['user_role'] == 'management' else User.query.filter_by(role='resident')
+    return render_template("users.html", users=query.all())
 
-@web_bp.route("/users/toggle/<int:user_id>")
+@web_bp.route("/users/toggle/<int:user_id>", methods=["POST"])
 @login_required
 @role_required('management')
 def toggle_user(user_id):
@@ -732,7 +748,7 @@ def health():
     return jsonify({'server': 'healthy', 'database': db_status, 'network': 'healthy'})
 
 
-@web_bp.route("/unlock-user/<int:user_id>")
+@web_bp.route("/unlock-user/<int:user_id>", methods=["POST"])
 @login_required
 @role_required('management')
 def unlock_user(user_id):
@@ -758,30 +774,31 @@ def incidents():
     # Get date filters from query string (optional)
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+    door_id = request.args.get('door_id', type=int)
+    errors = []
 
-    query = AccessLog.query
+    query = db.session.query(AccessLog, User, Door).outerjoin(User, AccessLog.user_id == User.id).outerjoin(Door, AccessLog.door_id == Door.id)
 
     if start_date:
         try:
             start = datetime.strptime(start_date, '%Y-%m-%d')
             query = query.filter(AccessLog.timestamp >= start)
         except ValueError:
-            flash("Invalid start date format. Use YYYY-MM-DD.", "error")
+            errors.append("Invalid start date format. Use YYYY-MM-DD.")
 
     if end_date:
         try:
             end = datetime.strptime(end_date + ' 23:59:59', '%Y-%m-%d %H:%M:%S')
             query = query.filter(AccessLog.timestamp <= end)
         except ValueError:
-            flash("Invalid end date format. Use YYYY-MM-DD.", "error")
+            errors.append("Invalid end date format. Use YYYY-MM-DD.")
 
-    # Order by most recent first
-    logs = query.order_by(AccessLog.timestamp.desc()).all()
+    if door_id:
+        query = query.filter(AccessLog.door_id == door_id)
 
-    # For each log, add human‑readable reason
-    for log in logs:
-        user = User.query.get(log.user_id)
-        door = Door.query.get(log.door_id)
+    logs = []
+    for log, user, door in query.order_by(AccessLog.timestamp.desc()).all():
+        logs.append(log)
         log.user_name = f"{user.first_name} {user.last_name}" if user else "Unknown"
         log.door_name = door.name if door else "Unknown"
         log.reason = []
@@ -793,7 +810,8 @@ def incidents():
             log.reason.append("permission denied")
         log.reason_str = ", ".join(log.reason) if log.reason else "Success"
 
-    return render_template("incidents.html", logs=logs, start_date=start_date, end_date=end_date)
+    return render_template("incidents.html", logs=logs, start_date=start_date, end_date=end_date,
+                           door_id=door_id, doors=Door.query.order_by(Door.name).all(), errors=errors)
 
 
 @web_bp.route("/profile/incidents")

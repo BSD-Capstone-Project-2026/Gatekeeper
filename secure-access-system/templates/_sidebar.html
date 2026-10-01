@@ -9,17 +9,15 @@
     <a href="{{ url_for('web.incident_list') }}">
         <i class="bi bi-exclamation-triangle"></i> Incidents
     </a>
+    {% endif %}
+
+    {% if session.user_role == 'management' %}
     <a href="{{ url_for('web.emergency_override') }}">
         <i class="bi bi-shield-exclamation"></i> Emergency Override
     </a>
-    {% endif %}
-
-    
-
-    {% if session.user_role == 'management' %}
     <a href="{{ url_for('web.list_zones') }}"><i class="bi bi-grid-3x3-gap-fill"></i> Zones</a>
     <a href="{{ url_for('web.list_doors') }}"><i class="bi bi-door-open"></i> Doors</a>
-    <a href="{{ url_for('web.incidents') }}"><i class="bi bi-exclamation-triangle"></i> Incidents</a>
+    <a href="{{ url_for('web.incidents') }}"><i class="bi bi-journal-text"></i> Access Logs</a>
     {% endif %}
 
     {% if session.user_role == 'resident' %}

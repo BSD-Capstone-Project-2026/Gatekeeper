@@ -70,6 +70,26 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 
 ---
 
+## Role Permissions
+
+| Route | Management | Concierge | Resident |
+|-------|:---:|:---:|:---:|
+| `/dashboard` (stats, chart, recent users) | ✅ | ✅ | Health only |
+| `/api/dashboard/stats`, `/api/dashboard/recent-users` | ✅ | ✅ | ❌ |
+| `/users` | All users | Residents only | ❌ |
+| `/create-user` | Concierge, Resident | Resident | ❌ |
+| `/users/toggle/<id>`, `/unlock-user/<id>` (POST) | ✅ | ❌ | ❌ |
+| `/users/<id>/zones`, `/zones/*`, `/doors/*` | ✅ | ❌ | ❌ |
+| `/incident-list`, `/incidents/<id>/acknowledge` (POST) | ✅ | ✅ | ❌ |
+| `/incidents`, `/incidents/<id>`, `/audit` | ✅ | ❌ | ❌ |
+| `/emergency-override` | ✅ | ❌ | ❌ |
+| `/simulate` | ❌ | ❌ | ✅ |
+| `/profile`, `/profile/incidents`, `/reset-password` | ✅ | ✅ | ✅ |
+
+Denied requests return `403` and are recorded in the audit log as `access_denied`.
+
+---
+
 ## Getting Started
 
 ```bash

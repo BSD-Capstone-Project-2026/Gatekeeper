@@ -5,12 +5,11 @@ from flask import Flask
 from flask_jwt_extended import JWTManager
 from flask_login import LoginManager
 from config import Config
-from models import db, User, Door, Zone, AccessLog, AccessLogArchive
+from models import db, User, Door, Zone, AccessLog, AccessLogArchive, add_missing_columns
 from routes.web import access_bp, web_bp
 from routes.auth import auth_bp
 from routes.users import users_bp
 from routes.protected import protected_bp
-from routes.dashboard import dashboard_bp
 import secrets
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
@@ -49,6 +48,8 @@ def backup_task():
 def create_app(config=Config):
     app = Flask(__name__, template_folder='templates')
     app.config.from_object(config)
+    if not app.config.get("ENCRYPTION_KEY"):
+        raise RuntimeError("ENCRYPTION_KEY must be set when APP_ENV=production")
 
     # Initialize Extensions
     db.init_app(app)
@@ -68,11 +69,11 @@ def create_app(config=Config):
     app.register_blueprint(protected_bp)
     app.register_blueprint(web_bp)
     app.register_blueprint(access_bp)
-    app.register_blueprint(dashboard_bp)
 
     # Database Setup + Seeding
     with app.app_context():
         db.create_all()
+        add_missing_columns()
         if app.config.get("TESTING"):
             return app
 

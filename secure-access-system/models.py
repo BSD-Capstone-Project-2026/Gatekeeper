@@ -2,8 +2,19 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import bcrypt
 from flask_login import UserMixin
+from utils.encryption import encrypt, decrypt
 
 db = SQLAlchemy()
+
+
+def add_missing_columns():
+    inspector = db.inspect(db.engine)
+    for table in db.metadata.sorted_tables:
+        existing = {c["name"] for c in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name not in existing:
+                db.session.execute(db.text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {column.type.compile(db.engine.dialect)}"))
+    db.session.commit()
 
 # Association table for users and zones (many-to-many)
 user_zones = db.Table('user_zones',
@@ -34,7 +45,7 @@ class User(db.Model, UserMixin):
     # Door access fields
     unit_number = db.Column(db.String(10), nullable=True)
     floor = db.Column(db.Integer, nullable=True)
-    door_code = db.Column(db.String(20), unique=True, nullable=True)
+    _door_code = db.Column("door_code", db.String(200), unique=True, nullable=True)
 
     # Password reset fields
     reset_token = db.Column(db.String(100), nullable=True)
@@ -43,7 +54,13 @@ class User(db.Model, UserMixin):
     # Relationship to zones (many-to-many)
     zones = db.relationship('Zone', secondary=user_zones, backref=db.backref('users', lazy='dynamic'))
 
+    @property
+    def door_code(self):
+        return decrypt(self._door_code) if self._door_code else None
 
+    @door_code.setter
+    def door_code(self, value):
+        self._door_code = encrypt(value) if value else None
 
     def set_password(self, password):
         hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
@@ -69,8 +86,11 @@ class Incident(db.Model):
     last_attempt_time = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     resolved_at = db.Column(db.DateTime, nullable=True)
+    acknowledged_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    acknowledged_at = db.Column(db.DateTime, nullable=True)
 
     door = db.relationship('Door')
+    acknowledger = db.relationship('User', foreign_keys=[acknowledged_by])
 
     def get_related_logs(self):
         return AccessLog.query.filter(

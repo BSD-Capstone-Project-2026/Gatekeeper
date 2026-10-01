@@ -79,22 +79,18 @@
                                     <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</td>
                                     <td>
                                         <div class="btn-group btn-group-sm" role="group">
+                                            {% if session.user_role == 'management' %}
                                             {% if user.is_locked %}
-                                            <a href="{{ url_for('web.unlock_user', user_id=user.id) }}" 
-                                               class="btn btn-success" title="Unlock Account">
-                                                <i class="bi bi-unlock"></i>
-                                            </a>
+                                            <form method="POST" action="{{ url_for('web.unlock_user', user_id=user.id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-success" title="Unlock Account"><i class="bi bi-unlock"></i></button>
+                                            </form>
                                             {% else %}
-                                            <a href="{{ url_for('web.toggle_user', user_id=user.id) }}" 
-                                               class="btn btn-warning" 
-                                               title="{{ 'Deactivate' if user.is_active else 'Activate' }}">
-                                                <i class="bi bi-power"></i>
-                                            </a>
+                                            <form method="POST" action="{{ url_for('web.toggle_user', user_id=user.id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-warning" title="{{ 'Deactivate' if user.is_active else 'Activate' }}"><i class="bi bi-power"></i></button>
+                                            </form>
                                             {% endif %}
-                                            <td>
-    <a href="{{ url_for('web.manage_user_zones', user_id=user.id) }}" class="btn btn-sm btn-info">Zones</a>
-    <!-- existing toggle/unlock buttons -->
-</td>
+                                            <a href="{{ url_for('web.manage_user_zones', user_id=user.id) }}" class="btn btn-info">Zones</a>
+                                            {% endif %}
                                             <button type="button" class="btn btn-info" 
                                                     data-bs-toggle="modal" 
                                                     data-bs-target="#userModal{{ user.id }}"
@@ -153,9 +149,10 @@
                                             </div>
                                             <div class="modal-footer">
                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                                {% if user.is_locked %}
-                                                <a href="{{ url_for('web.unlock_user', user_id=user.id) }}" 
-                                                   class="btn btn-success">Unlock Account</a>
+                                                {% if user.is_locked and session.user_role == 'management' %}
+                                                <form method="POST" action="{{ url_for('web.unlock_user', user_id=user.id) }}" class="d-inline">
+                                                    <button type="submit" class="btn btn-success">Unlock Account</button>
+                                                </form>
                                                 {% endif %}
                                             </div>
                                         </div>
