@@ -21,7 +21,7 @@ def test_resident_dashboard_offers_access(make_user, login, client):
 def test_sidebar_sections_slide_and_remember(make_user, login, client):
     login(make_user("management"))
     page = client.get("/dashboard").data.decode()
-    assert page.count('data-bs-toggle="collapse"') == 3 and "localStorage.setItem(key, 'closed')" in page
+    assert page.count('data-bs-toggle="collapse"') == 4 and "localStorage.setItem(key, 'closed')" in page
 
 
 def test_account_menu_has_profile_password_and_sign_out(make_user, login, client):

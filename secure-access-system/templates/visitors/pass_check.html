@@ -1,0 +1,45 @@
+{% extends "visitors/_layout.html" %}
+{% block title %}Pass Check - Gatekeeper{% endblock %}
+{% block heading %}Visitors{% endblock %}
+{% block description %}Scan or type a visitor's pass code to admit them through the main entrance.{% endblock %}
+
+{% block tab %}
+<div class="row g-4">
+    <div class="col-lg-6">
+        <form class="card check-card" method="POST" action="{{ url_for('visitors.check_pass') }}">
+            <div class="card-body">
+                <label class="form-label" for="code">Pass code</label>
+                <input class="form-control code-input" id="code" name="code" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="e.g. K7PX2M9Q" autofocus required>
+                <button class="btn btn-primary btn-lg w-100 mt-3" type="submit">Check Pass</button>
+            </div>
+        </form>
+
+        {% if result %}
+        <div class="result-card {{ 'is-ok' if result.ok else 'is-denied' }} mt-3" role="status">
+            <i class="bi bi-{{ 'check-circle-fill' if result.ok else 'x-circle-fill' }}"></i>
+            <div>
+                <div class="result-title">{{ result.title }}</div>
+                <div class="result-detail">{{ result.detail }}</div>
+                {% if result.ok %}<div class="result-detail">Main entrance · valid until <time data-local datetime="{{ result.until.isoformat() }}Z"></time></div>{% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">Recent Visitor Check-ins</div>
+            <ul class="list-group list-group-flush">
+                {% for log, resident in recent %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><span class="status-dot {{ 'ok' if log.success else 'fail' }}"></span>{{ log.visitor_name }} <small class="text-muted">· Unit {{ resident.unit_number or '—' }}</small></span>
+                    <small class="text-muted">{{ 'Admitted' if log.success else log.failure_reason }} · <time data-local datetime="{{ log.timestamp.isoformat() }}Z"></time></small>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">No visitor check-ins yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

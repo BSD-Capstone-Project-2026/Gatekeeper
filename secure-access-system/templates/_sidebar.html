@@ -10,6 +10,9 @@
         ('web.simulate', 'door-open', 'Access', role in ['resident', 'guest', 'cleaner']),
         ('web.my_incidents', 'clock-history', 'Access History', not staff)
     ]),
+    ('Visitors', [
+        ('visitors.passes', 'qr-code', 'Pass Check' if staff else 'Visitor Passes', staff or role == 'resident')
+    ]),
     ('Manage', [
         ('web.users_list', 'people', 'Users', staff),
         ('web.create_user', 'person-plus', 'Create User', staff),

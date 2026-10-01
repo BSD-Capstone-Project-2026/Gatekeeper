@@ -158,12 +158,15 @@ class AccessLog(db.Model):
     proximity_verified = db.Column(db.Boolean)
     ip_address = db.Column(db.String(45))
     user_agent = db.Column(db.String(200))
+    visitor_name = db.Column(db.String(80), nullable=True)
     prev_hash = db.Column(db.String(64))
     row_hash = db.Column(db.String(64))
 
     def compute_hash(self):
         fields = [self.user_id, self.door_id, self.timestamp.isoformat(), self.success, self.failure_reason,
                   self.wifi_verified, self.proximity_verified, self.ip_address, self.user_agent, self.prev_hash]
+        if self.visitor_name:
+            fields.append(self.visitor_name)
         return hashlib.sha256("|".join(map(str, fields)).encode()).hexdigest()
 
 
@@ -197,6 +200,31 @@ class RateLimitBlock(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     door_id = db.Column(db.Integer, db.ForeignKey('doors.id'), nullable=False)
     blocked_until = db.Column(db.DateTime, nullable=False)
+
+class VisitorPass(db.Model):
+    __tablename__ = 'visitor_passes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(12), unique=True, nullable=False)
+    resident_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    visitor_name = db.Column(db.String(80), nullable=False)
+    valid_from = db.Column(db.DateTime, nullable=False)
+    valid_until = db.Column(db.DateTime, nullable=False)
+    revoked_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    resident = db.relationship('User')
+
+    @property
+    def status(self):
+        now = datetime.utcnow()
+        if self.revoked_at:
+            return "Revoked"
+        if now > self.valid_until:
+            return "Expired"
+        if now < self.valid_from:
+            return "Scheduled"
+        return "Active"
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'

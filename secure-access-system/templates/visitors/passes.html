@@ -1,0 +1,95 @@
+{% extends "visitors/_layout.html" %}
+{% block title %}Visitor Passes - Gatekeeper{% endblock %}
+{% block heading %}Visitors{% endblock %}
+{% block description %}Send a time-limited pass so your visitor can check in at the front desk without a phone call.{% endblock %}
+{% block actions %}<button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#new-pass"><i class="bi bi-plus-lg me-1"></i>New Pass</button>{% endblock %}
+
+{% block tab %}
+{% if passes %}
+<div class="pass-grid">
+    {% for p in passes %}
+    <article class="card pass-card{{ ' pass-new' if request.args.get('created')|int == p.id }}{{ ' is-inactive' if p.status in ['Expired', 'Revoked'] }}">
+        <div class="card-body">
+            <button class="qr-tile" type="button" data-bs-toggle="modal" data-bs-target="#qr-{{ p.id }}" aria-label="Show QR code for {{ p.visitor_name }}">
+                <img src="{{ url_for('visitors.pass_qr', pass_id=p.id) }}" alt="">
+            </button>
+            <div class="pass-info">
+                <div class="d-flex align-items-center justify-content-between gap-2">
+                    <h5 class="mb-0">{{ p.visitor_name }}</h5>
+                    <span class="badge {{ {'Active': 'bg-success', 'Scheduled': 'bg-primary', 'Expired': 'bg-secondary', 'Revoked': 'bg-danger'}[p.status] }}">{{ p.status }}</span>
+                </div>
+                <div class="pass-code">{{ p.code }}</div>
+                <div class="text-muted small"><time data-local datetime="{{ p.valid_from.isoformat() }}Z"></time> – <time data-local datetime="{{ p.valid_until.isoformat() }}Z"></time></div>
+            </div>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-icon" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Actions for {{ p.visitor_name }}"><i class="bi bi-three-dots"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#qr-{{ p.id }}"><i class="bi bi-qr-code"></i>Show QR Code</button></li>
+                    <li><button class="dropdown-item" type="button" onclick="navigator.clipboard.writeText('{{ p.code }}')"><i class="bi bi-clipboard"></i>Copy Code</button></li>
+                    {% if p.status in ['Active', 'Scheduled'] %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li><form method="POST" action="{{ url_for('visitors.revoke_pass', pass_id=p.id) }}"><button class="dropdown-item text-danger" type="submit"><i class="bi bi-x-circle"></i>Revoke Pass</button></form></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </article>
+
+    <div class="modal fade" id="qr-{{ p.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content sheet text-center">
+                <div class="modal-body p-4">
+                    <h5 class="mb-1">{{ p.visitor_name }}</h5>
+                    <p class="text-muted small mb-3">Show this code at the front desk</p>
+                    <div class="qr-large"><img src="{{ url_for('visitors.pass_qr', pass_id=p.id) }}" alt="QR code for {{ p.visitor_name }}"></div>
+                    <div class="pass-code fs-4 mt-3">{{ p.code }}</div>
+                    <button class="btn btn-secondary w-100 mt-3" type="button" data-bs-dismiss="modal">Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state card">
+    <div class="card-body">
+        <span class="stat-icon tone-primary"><i class="bi bi-qr-code"></i></span>
+        <h5>No visitor passes yet</h5>
+        <p class="text-muted">Create a pass and share its code with your visitor. The front desk checks it when they arrive.</p>
+        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#new-pass">New Pass</button>
+    </div>
+</div>
+{% endif %}
+
+<div class="modal fade" id="new-pass" tabindex="-1" aria-labelledby="new-pass-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content sheet" method="POST" action="{{ url_for('visitors.create_pass') }}">
+            <div class="sheet-header">
+                <button class="btn btn-link" type="button" data-bs-dismiss="modal">Cancel</button>
+                <h5 class="mb-0" id="new-pass-title">New Pass</h5>
+                <button class="btn btn-link fw-semibold" type="submit">Create</button>
+            </div>
+            <div class="modal-body">
+                <div class="inset-group">
+                    <label class="inset-row"><span>Visitor</span><input class="form-control" name="visitor_name" maxlength="80" placeholder="Full name" required></label>
+                    <label class="inset-row"><span>From</span><input class="form-control" type="datetime-local" name="valid_from" id="valid-from" required></label>
+                    <label class="inset-row"><span>Until</span><input class="form-control" type="datetime-local" name="valid_until" id="valid-until" required></label>
+                </div>
+                <p class="text-muted small mt-2 mb-0">Passes can last up to {{ max_days }} days and can be revoked at any time.</p>
+                <input type="hidden" name="tz_offset" id="tz-offset">
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block tab_scripts %}
+<script>
+    const toLocalInput = date => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const now = new Date();
+    document.getElementById('valid-from').value = toLocalInput(now);
+    document.getElementById('valid-until').value = toLocalInput(new Date(now.getTime() + 4 * 3600000));
+    document.getElementById('tz-offset').value = now.getTimezoneOffset();
+    {% if error %}bootstrap.Modal.getOrCreateInstance(document.getElementById('new-pass')).show();{% endif %}
+</script>
+{% endblock %}
