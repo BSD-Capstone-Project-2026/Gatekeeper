@@ -10,7 +10,8 @@
 {% block body %}
 {% set staff = session.user_role in ['concierge', 'management'] %}
 {% set desk_tabs = [
-    ('desk.packages', 'box-seam', 'Packages', staff, ['desk.packages', 'desk.log_package'])
+    ('desk.packages', 'box-seam', 'Packages', staff, ['desk.packages', 'desk.log_package']),
+    ('desk.shift_log', 'journal-text', 'Shift Log', staff, ['desk.shift_log', 'desk.add_shift_entry'])
 ] %}
 <nav class="segmented mb-4" aria-label="Front desk sections">
     {% for endpoint, icon, label, visible, matches in desk_tabs if visible %}

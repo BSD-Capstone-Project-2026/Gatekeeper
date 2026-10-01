@@ -1,0 +1,71 @@
+{% extends "desk/_layout.html" %}
+{% block title %}Shift Log - Gatekeeper{% endblock %}
+{% block description %}Record what happens on shift and hand open items to the next concierge.{% endblock %}
+
+{% block tab %}
+<div class="row g-4">
+    <div class="col-lg-5">
+        <form class="card composer" method="POST" action="{{ url_for('desk.add_shift_entry') }}">
+            <div class="card-body">
+                <h5 class="mb-3">New entry</h5>
+                {% if form_error %}<div class="alert alert-danger py-2" role="alert">{{ form_error }}</div>{% endif %}
+                <div class="chip-row mb-3" role="radiogroup" aria-label="Category">
+                    {% for c in categories %}
+                    <input class="btn-check" type="radio" name="category" id="category-{{ loop.index }}" value="{{ c }}" {{ 'checked' if c == request.form.get('category', categories[0]) }}>
+                    <label class="chip" for="category-{{ loop.index }}">{{ c }}</label>
+                    {% endfor %}
+                </div>
+                <textarea class="form-control mb-3" name="body" rows="3" maxlength="500" placeholder="What happened?" aria-label="Entry" required>{{ request.form.get('body', '') }}</textarea>
+                <div class="inset-group mb-3">
+                    <label class="inset-row"><span>Unit</span><input class="form-control" name="unit" list="units" maxlength="10" placeholder="Optional" value="{{ request.form.get('unit', '') }}" autocomplete="off"></label>
+                    <label class="inset-row toggle-row"><span>Hand over to next shift</span><input class="form-check-input ms-auto" type="checkbox" role="switch" name="handover" {{ 'checked' if request.form.get('handover') }}></label>
+                </div>
+                <datalist id="units">{% for u in units %}<option value="{{ u }}">{% endfor %}</datalist>
+                <button class="btn btn-primary w-100" type="submit">Add to Log</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="col-lg-7">
+        <form class="filter-bar mb-3" method="GET" action="{{ url_for('desk.shift_log') }}" role="search">
+            <div class="search-field flex-grow-1"><i class="bi bi-search"></i><input class="form-control" name="q" value="{{ filters.q }}" placeholder="Search entries" aria-label="Keyword"></div>
+            <input class="form-control" type="date" name="date" value="{{ filters.date }}" aria-label="Date">
+            <input class="form-control" name="unit" value="{{ filters.unit }}" placeholder="Unit" aria-label="Unit">
+            <select class="form-select" name="staff" aria-label="Staff member">
+                <option value="">All staff</option>
+                {% for s in staff %}<option value="{{ s.id }}" {{ 'selected' if filters.staff == s.id|string }}>{{ s.first_name }} {{ s.last_name }}</option>{% endfor %}
+            </select>
+            <input type="hidden" name="tz_offset" id="tz-offset">
+            <button class="btn btn-secondary" type="submit">Filter</button>
+        </form>
+
+        <div class="timeline">
+            {% for e in entries %}
+            <article class="timeline-item{{ ' is-handover' if e.is_handover }}">
+                <span class="request-avatar timeline-avatar">{{ e.author.first_name[:1] }}</span>
+                <div class="card flex-grow-1">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                            <span class="fw-semibold">{{ e.author.first_name }} {{ e.author.last_name }}</span>
+                            <span class="chip chip-static">{{ e.category }}</span>
+                            {% if e.unit_number %}<span class="unit-pill">{{ e.unit_number }}</span>{% endif %}
+                            <small class="text-muted ms-auto"><time data-local datetime="{{ e.created_at.isoformat() }}Z"></time></small>
+                        </div>
+                        <div>{{ e.body }}</div>
+                        {% if e.is_handover %}
+                        <small class="handover-state"><i class="bi bi-pin-angle-fill me-1"></i>{% if e.acknowledged_at %}Handover acknowledged by {{ e.acknowledger.first_name }}{% else %}Handover waiting for the next shift{% endif %}</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </article>
+            {% else %}
+            <div class="card empty-inline"><div class="card-body text-muted"><i class="bi bi-journal me-2"></i>{{ 'No entries match these filters.' if filters.values()|select|list else 'No entries yet.' }}</div></div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tab_scripts %}
+<script>document.getElementById('tz-offset').value = new Date().getTimezoneOffset();</script>
+{% endblock %}

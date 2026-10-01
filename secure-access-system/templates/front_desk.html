@@ -1,9 +1,23 @@
 {% extends "app_base.html" %}
 {% block title %}Front Desk - Gatekeeper{% endblock %}
+{% block head %}<link href="{{ url_for('static', filename='css/desk.css') }}" rel="stylesheet">{% endblock %}
 {% block heading %}Front Desk{% endblock %}
 {% block description %}<span id="today"></span> · Alerts, doors and live activity in one place.{% endblock %}
 
 {% block body %}
+{% for h in handovers %}
+<div class="card handover-card mb-3" role="status">
+    <div class="card-body d-flex align-items-center gap-3">
+        <span class="stat-icon tone-warning"><i class="bi bi-pin-angle-fill"></i></span>
+        <div class="flex-grow-1">
+            <div class="fw-semibold">Handover from {{ h.author.first_name }} {{ h.author.last_name }}{% if h.unit_number %} · Unit {{ h.unit_number }}{% endif %}</div>
+            <div>{{ h.body }}</div>
+            <small class="text-muted">{{ h.category }} · {{ h.created_at.strftime('%b %d · %H:%M') }} UTC</small>
+        </div>
+        <form method="POST" action="{{ url_for('desk.acknowledge_handover', entry_id=h.id) }}"><button class="btn btn-primary" type="submit">Acknowledge</button></form>
+    </div>
+</div>
+{% endfor %}
 {% for alert in watchlist_alerts %}
 <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
     <i class="bi bi-shield-x"></i>

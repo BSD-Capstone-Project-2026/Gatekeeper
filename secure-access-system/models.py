@@ -315,6 +315,22 @@ class Package(db.Model):
     logger = db.relationship('User', foreign_keys=[logged_by])
     releaser = db.relationship('User', foreign_keys=[released_by])
 
+class ShiftLogEntry(db.Model):
+    __tablename__ = 'shift_log_entries'
+
+    id = db.Column(db.Integer, primary_key=True)
+    author_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    category = db.Column(db.String(20), nullable=False)
+    unit_number = db.Column(db.String(10), nullable=True)
+    body = db.Column(db.String(500), nullable=False)
+    is_handover = db.Column(db.Boolean, default=False)
+    acknowledged_at = db.Column(db.DateTime, nullable=True)
+    acknowledged_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    author = db.relationship('User', foreign_keys=[author_id])
+    acknowledger = db.relationship('User', foreign_keys=[acknowledged_by])
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 

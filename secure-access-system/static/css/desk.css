@@ -75,3 +75,61 @@
 .package-row.is-done {
     opacity: 0.75;
 }
+
+.toggle-row > span {
+    width: auto;
+}
+
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.filter-bar > .form-control,
+.filter-bar > .form-select {
+    flex: 0 1 150px;
+    border-radius: 12px;
+}
+
+.filter-bar .search-field {
+    min-width: 200px;
+}
+
+.timeline {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.timeline-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.timeline-avatar {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    font-size: 1rem;
+}
+
+.chip-static {
+    padding: 0.1rem 0.6rem;
+    font-size: 0.75rem;
+    cursor: default;
+}
+
+.timeline-item.is-handover .card {
+    box-shadow: inset 3px 0 0 rgb(var(--bs-warning-rgb)), var(--app-shadow);
+}
+
+.handover-state {
+    display: block;
+    margin-top: 0.4rem;
+    color: var(--app-orange-text);
+}
+
+.handover-card {
+    box-shadow: inset 4px 0 0 rgb(var(--bs-warning-rgb)), var(--app-shadow);
+}
