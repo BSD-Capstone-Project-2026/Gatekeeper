@@ -165,3 +165,42 @@
 .key-name {
     width: 11rem;
 }
+
+.item-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.item-card .card-body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    height: 100%;
+    padding: 1.1rem;
+}
+
+.item-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 0.4rem;
+    border-radius: 12px;
+    background: rgba(var(--bs-info-rgb), 0.16);
+    color: var(--app-accent-text);
+    font-size: 1.2rem;
+}
+
+.item-notes {
+    margin: 0.25rem 0 0.5rem;
+    padding: 0.5rem 0.7rem;
+    border-radius: 10px;
+    background: var(--app-fill);
+    font-size: 0.85rem;
+}
+
+.inset-row > span {
+    white-space: nowrap;
+}

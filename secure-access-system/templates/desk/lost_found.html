@@ -1,0 +1,96 @@
+{% extends "desk/_layout.html" %}
+{% set staff = session.user_role in ['concierge', 'management'] %}
+{% block title %}Lost & Found - Gatekeeper{% endblock %}
+{% block description %}{% if staff %}Log items found in the building and record who collects them.{% else %}Items found in the building. If one is yours, collect it at the front desk.{% endif %}{% endblock %}
+{% block actions %}{% if staff %}<button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#log-item"><i class="bi bi-plus-lg me-1"></i>Log Item</button>{% endif %}{% endblock %}
+
+{% block tab %}
+<h6 class="section-title">Unclaimed · {{ unclaimed|length }}</h6>
+{% if unclaimed %}
+<div class="item-grid mb-4">
+    {% for item in unclaimed %}
+    <article class="card item-card">
+        <div class="card-body">
+            <span class="item-icon"><i class="bi bi-bag"></i></span>
+            <h5 class="mb-1">{{ item.description }}</h5>
+            <div class="text-muted small"><i class="bi bi-geo-alt me-1"></i>{{ item.found_location }} · <time data-local datetime="{{ item.found_at.isoformat() }}Z"></time></div>
+            {% if staff %}
+            {% if item.notes %}<p class="item-notes">{{ item.notes }}</p>{% endif %}
+            <button class="btn btn-sm btn-secondary mt-auto" type="button" data-bs-toggle="modal" data-bs-target="#return-item" data-item="{{ item.description }}" data-action="{{ url_for('desk.return_lost_item', item_id=item.id) }}">Mark Returned</button>
+            {% endif %}
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card empty-inline mb-4"><div class="card-body text-muted"><i class="bi bi-check2-circle me-2"></i>Nothing waiting to be claimed.</div></div>
+{% endif %}
+
+{% if staff %}
+<h6 class="section-title">Returned</h6>
+<div class="card">
+    <ul class="list-group list-group-flush">
+        {% for item in returned %}
+        <li class="list-group-item d-flex flex-wrap justify-content-between gap-2">
+            <span><span class="fw-semibold">{{ item.description }}</span> · {{ item.found_location }}</span>
+            <small class="text-muted">Returned to {{ item.claimant_name }} <time data-local datetime="{{ item.returned_at.isoformat() }}Z"></time> by {{ item.returner.first_name }}</small>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">No items returned yet.</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="modal fade" id="log-item" tabindex="-1" aria-labelledby="log-item-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content sheet" method="POST" action="{{ url_for('desk.log_lost_item') }}">
+            <div class="sheet-header">
+                <button class="btn btn-link" type="button" data-bs-dismiss="modal">Cancel</button>
+                <h5 class="mb-0" id="log-item-title">Log Item</h5>
+                <button class="btn btn-link fw-semibold" type="submit">Log</button>
+            </div>
+            <div class="modal-body">
+                {% if sheet_error and not error_item %}<div class="alert alert-danger py-2" role="alert">{{ sheet_error }}</div>{% endif %}
+                <div class="inset-group">
+                    <label class="inset-row"><span>Item</span><input class="form-control" name="description" maxlength="120" placeholder="e.g. Black umbrella" value="{{ request.form.get('description', '') }}" required></label>
+                    <label class="inset-row"><span>Found</span><input class="form-control" name="location" maxlength="80" placeholder="e.g. Lobby" value="{{ request.form.get('location', '') }}" required></label>
+                    <label class="inset-row"><span>Staff note</span><input class="form-control" name="notes" maxlength="200" placeholder="Optional, staff only" value="{{ request.form.get('notes', '') }}"></label>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="return-item" tabindex="-1" aria-labelledby="return-item-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content sheet" method="POST" action="{{ url_for('desk.return_lost_item', item_id=error_item) if error_item }}">
+            <div class="sheet-header">
+                <button class="btn btn-link" type="button" data-bs-dismiss="modal">Cancel</button>
+                <h5 class="mb-0" id="return-item-title">Mark Returned</h5>
+                <button class="btn btn-link fw-semibold" type="submit">Done</button>
+            </div>
+            <div class="modal-body">
+                {% if sheet_error and error_item %}<div class="alert alert-danger py-2" role="alert">{{ sheet_error }}</div>{% endif %}
+                <div class="inset-group">
+                    <label class="inset-row"><span>Collected by</span><input class="form-control" name="claimant" maxlength="80" placeholder="Full name" required></label>
+                </div>
+                <p class="text-muted small mt-2 mb-0">Check the person can describe the item before handing it over.</p>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block tab_scripts %}
+{% if staff %}
+<script>
+    document.getElementById('return-item').addEventListener('show.bs.modal', event => {
+        if (!event.relatedTarget) return;
+        event.target.querySelector('form').action = event.relatedTarget.dataset.action;
+        document.getElementById('return-item-title').textContent = 'Return ' + event.relatedTarget.dataset.item;
+    });
+    {% if sheet_error %}bootstrap.Modal.getOrCreateInstance(document.getElementById('{{ 'return-item' if error_item else 'log-item' }}')).show();{% endif %}
+</script>
+{% endif %}
+{% endblock %}

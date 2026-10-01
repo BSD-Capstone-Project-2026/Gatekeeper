@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, redirect, render_template, request, session, url_for
 
-from models import db, BuildingKey, KeyLoan, Package, ShiftLogEntry, User
+from models import db, BuildingKey, KeyLoan, LostItem, Package, ShiftLogEntry, User
 from routes.decorators import role_required
 from routes.web import login_required
 from routes.visitors import STAFF, parse_local, resident_units
@@ -161,3 +161,43 @@ def return_key(loan_id):
         loan.received_by = session['user_id']
         db.session.commit()
     return redirect(url_for("desk.keys"))
+
+
+@desk_bp.route("/lost-found")
+@login_required
+@role_required('resident', *STAFF)
+def lost_found(error=None, status=200):
+    unclaimed = LostItem.query.filter(LostItem.returned_at.is_(None)).order_by(LostItem.found_at.desc()).all()
+    returned = LostItem.query.filter(LostItem.returned_at.isnot(None)).order_by(LostItem.returned_at.desc()).limit(10).all()         if session['user_role'] in STAFF else []
+    return render_template("desk/lost_found.html", unclaimed=unclaimed, returned=returned, sheet_error=error,
+                           error_item=request.view_args.get("item_id")), status
+
+
+@desk_bp.route("/lost-found", methods=["POST"])
+@login_required
+@role_required(*STAFF)
+def log_lost_item():
+    description = clean(request.form.get("description"), 120)
+    location = clean(request.form.get("location"), 80)
+    if not description or not location:
+        return lost_found(error="Describe the item and where it was found.", status=400)
+    db.session.add(LostItem(description=description, found_location=location, notes=clean(request.form.get("notes"), 200) or None,
+                            logged_by=session['user_id']))
+    db.session.commit()
+    return redirect(url_for("desk.lost_found"))
+
+
+@desk_bp.route("/lost-found/<int:item_id>/return", methods=["POST"])
+@login_required
+@role_required(*STAFF)
+def return_lost_item(item_id):
+    item = LostItem.query.get_or_404(item_id)
+    claimant = clean(request.form.get("claimant"), 80)
+    if not claimant:
+        return lost_found(error="Enter the name of the person collecting the item.", status=400)
+    if not item.returned_at:
+        item.returned_at = datetime.utcnow()
+        item.claimant_name = claimant
+        item.returned_by = session['user_id']
+        db.session.commit()
+    return redirect(url_for("desk.lost_found"))

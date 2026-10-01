@@ -19,7 +19,8 @@
     ('Front Desk', [
         ('desk.packages', 'box-seam', 'Packages', staff),
         ('desk.shift_log', 'journal-text', 'Shift Log', staff),
-        ('desk.keys', 'key', 'Keys', staff)
+        ('desk.keys', 'key', 'Keys', staff),
+        ('desk.lost_found', 'umbrella', 'Lost & Found', staff or role == 'resident')
     ]),
     ('Manage', [
         ('web.users_list', 'people', 'Users', staff),

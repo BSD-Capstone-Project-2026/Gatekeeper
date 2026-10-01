@@ -368,6 +368,22 @@ class KeyLoan(db.Model):
     issuer = db.relationship('User', foreign_keys=[signed_out_by])
     receiver = db.relationship('User', foreign_keys=[received_by])
 
+class LostItem(db.Model):
+    __tablename__ = 'lost_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    description = db.Column(db.String(120), nullable=False)
+    found_location = db.Column(db.String(80), nullable=False)
+    notes = db.Column(db.String(200), nullable=True)
+    found_at = db.Column(db.DateTime, default=datetime.utcnow)
+    logged_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    returned_at = db.Column(db.DateTime, nullable=True)
+    claimant_name = db.Column(db.String(80), nullable=True)
+    returned_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    logger = db.relationship('User', foreign_keys=[logged_by])
+    returner = db.relationship('User', foreign_keys=[returned_by])
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 

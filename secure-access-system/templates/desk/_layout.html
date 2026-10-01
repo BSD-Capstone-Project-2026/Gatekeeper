@@ -12,13 +12,16 @@
 {% set desk_tabs = [
     ('desk.packages', 'box-seam', 'Packages', staff, ['desk.packages', 'desk.log_package']),
     ('desk.shift_log', 'journal-text', 'Shift Log', staff, ['desk.shift_log', 'desk.add_shift_entry']),
-    ('desk.keys', 'key', 'Keys', staff, ['desk.keys', 'desk.add_key', 'desk.sign_out_key'])
+    ('desk.keys', 'key', 'Keys', staff, ['desk.keys', 'desk.add_key', 'desk.sign_out_key']),
+    ('desk.lost_found', 'umbrella', 'Lost & Found', True, ['desk.lost_found', 'desk.log_lost_item', 'desk.return_lost_item'])
 ] %}
+{% if desk_tabs|selectattr('3')|list|length > 1 %}
 <nav class="segmented mb-4" aria-label="Front desk sections">
     {% for endpoint, icon, label, visible, matches in desk_tabs if visible %}
     <a class="segmented-item{{ ' active' if request.endpoint in matches }}" href="{{ url_for(endpoint) }}"><i class="bi bi-{{ icon }}"></i>{{ label }}</a>
     {% endfor %}
 </nav>
+{% endif %}
 {% block tab %}{% endblock %}
 {% endblock %}
 

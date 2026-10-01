@@ -91,6 +91,7 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 | `/desk/packages` | ✅ | ✅ | Waiting packages on Home | ❌ |
 | `/desk/shift-log` | ✅ | ✅ | ❌ | ❌ |
 | `/desk/keys` | ✅ | ✅ | ❌ | ❌ |
+| `/desk/lost-found` | ✅ | ✅ | View unclaimed items | ❌ |
 | `/simulate` | ❌ | ❌ | ✅ | ✅ |
 | `/profile`, `/profile/incidents`, `/reset-password` | ✅ | ✅ | ✅ | ✅ |
 
