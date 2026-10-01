@@ -141,17 +141,43 @@ def check_pass():
     code = (request.form.get("code") or "").strip().upper()
     visitor_pass = VisitorPass.query.filter_by(code=code).first()
     if not visitor_pass:
-        result = {"ok": False, "title": "Pass not found", "detail": f"No pass matches code {code or '—'}."}
-    else:
-        reason = {"Expired": "Pass expired", "Revoked": "Pass revoked", "Scheduled": "Pass not yet valid"}.get(visitor_pass.status)
-        if not reason and block_if_watchlisted(visitor_pass.visitor_name, visitor_pass.resident.unit_number, visitor_pass.resident_id):
-            reason = BLOCKED_MESSAGE
-        record_visitor_entry(visitor_pass.resident, visitor_pass.visitor_name, reason is None, reason or "")
-        unit = visitor_pass.resident.unit_number or "—"
-        result = {"ok": reason is None, "title": f"Admit {visitor_pass.visitor_name}" if reason is None else reason,
-                  "detail": f"Visitor of {visitor_pass.resident.first_name} {visitor_pass.resident.last_name} · Unit {unit}",
-                  "until": visitor_pass.valid_until}
-    return render_template("visitors/pass_check.html", recent=recent_visitor_entries(), result=result), 200 if result["ok"] else 422
+        return pass_result({"state": "refused", "title": "Pass not found", "detail": f"No pass matches code {code or '—'}."})
+    reason = pass_refusal(visitor_pass)
+    if reason:
+        record_visitor_entry(visitor_pass.resident, visitor_pass.visitor_name, False, reason)
+        return pass_result({"state": "refused", "title": reason, "detail": host_detail(visitor_pass)})
+    return pass_result({"state": "verify", "pass": visitor_pass, "title": visitor_pass.visitor_name, "detail": host_detail(visitor_pass)})
+
+
+@visitors_bp.route("/visitors/passes/<int:pass_id>/admit", methods=["POST"])
+@login_required
+@role_required(*STAFF)
+def admit_pass(pass_id):
+    visitor_pass = VisitorPass.query.get_or_404(pass_id)
+    reason = pass_refusal(visitor_pass)
+    record_visitor_entry(visitor_pass.resident, visitor_pass.visitor_name, reason is None, reason or "")
+    if reason:
+        return pass_result({"state": "refused", "title": reason, "detail": host_detail(visitor_pass)})
+    visitor_pass.checked_in_at = datetime.utcnow()
+    visitor_pass.checked_in_by = session['user_id']
+    db.session.commit()
+    return pass_result({"state": "admitted", "title": f"{visitor_pass.visitor_name} admitted", "detail": host_detail(visitor_pass),
+                        "until": visitor_pass.valid_until})
+
+
+def pass_refusal(visitor_pass):
+    reason = {"Expired": "Pass expired", "Revoked": "Pass revoked", "Scheduled": "Pass not yet valid"}.get(visitor_pass.status)
+    if not reason and block_if_watchlisted(visitor_pass.visitor_name, visitor_pass.resident.unit_number, visitor_pass.resident_id):
+        reason = BLOCKED_MESSAGE
+    return reason
+
+
+def host_detail(visitor_pass):
+    return f"Visiting {visitor_pass.resident.first_name} {visitor_pass.resident.last_name} · Unit {visitor_pass.resident.unit_number or '—'}"
+
+
+def pass_result(result):
+    return render_template("visitors/pass_check.html", recent=recent_visitor_entries(), result=result), 422 if result["state"] == "refused" else 200
 
 
 def resident_units():

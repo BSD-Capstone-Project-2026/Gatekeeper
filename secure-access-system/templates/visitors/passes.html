@@ -1,7 +1,7 @@
 {% extends "visitors/_layout.html" %}
 {% block title %}Visitor Passes - Gatekeeper{% endblock %}
 {% block heading %}Visitors{% endblock %}
-{% block description %}Send a time-limited pass so your visitor can check in at the front desk without a phone call.{% endblock %}
+{% block description %}Send a time-limited pass. Your visitor shows it at the front desk and the concierge checks them in.{% endblock %}
 {% block actions %}<button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#new-pass"><i class="bi bi-plus-lg me-1"></i>New Pass</button>{% endblock %}
 
 {% block tab %}
@@ -16,17 +16,18 @@
             <div class="pass-info">
                 <div class="d-flex align-items-center justify-content-between gap-2">
                     <h5 class="mb-0">{{ p.visitor_name }}</h5>
-                    <span class="badge {{ {'Active': 'bg-success', 'Scheduled': 'bg-primary', 'Expired': 'bg-secondary', 'Revoked': 'bg-danger'}[p.status] }}">{{ p.status }}</span>
+                    <span class="badge {{ {'Active': 'bg-success', 'Checked in': 'bg-info', 'Scheduled': 'bg-primary', 'Expired': 'bg-secondary', 'Revoked': 'bg-danger'}[p.status] }}">{{ p.status }}</span>
                 </div>
                 <div class="pass-code">{{ p.code }}</div>
                 <div class="text-muted small"><time data-local datetime="{{ p.valid_from.isoformat() }}Z"></time> – <time data-local datetime="{{ p.valid_until.isoformat() }}Z"></time></div>
+                {% if p.checked_in_at %}<div class="text-muted small"><i class="bi bi-person-check me-1"></i>Checked in <time data-local datetime="{{ p.checked_in_at.isoformat() }}Z"></time></div>{% endif %}
             </div>
             <div class="dropdown">
                 <button class="btn btn-sm btn-icon" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Actions for {{ p.visitor_name }}"><i class="bi bi-three-dots"></i></button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#qr-{{ p.id }}"><i class="bi bi-qr-code"></i>Show QR Code</button></li>
                     <li><button class="dropdown-item" type="button" onclick="navigator.clipboard.writeText('{{ p.code }}')"><i class="bi bi-clipboard"></i>Copy Code</button></li>
-                    {% if p.status in ['Active', 'Scheduled'] %}
+                    {% if p.status in ['Active', 'Checked in', 'Scheduled'] %}
                     <li><hr class="dropdown-divider"></li>
                     <li><form method="POST" action="{{ url_for('visitors.revoke_pass', pass_id=p.id) }}"><button class="dropdown-item text-danger" type="submit"><i class="bi bi-x-circle"></i>Revoke Pass</button></form></li>
                     {% endif %}

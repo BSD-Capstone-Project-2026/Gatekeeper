@@ -212,8 +212,10 @@ class VisitorPass(db.Model):
     valid_until = db.Column(db.DateTime, nullable=False)
     revoked_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    checked_in_at = db.Column(db.DateTime, nullable=True)
+    checked_in_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
-    resident = db.relationship('User')
+    resident = db.relationship('User', foreign_keys=[resident_id])
 
     @property
     def status(self):
@@ -224,7 +226,7 @@ class VisitorPass(db.Model):
             return "Expired"
         if now < self.valid_from:
             return "Scheduled"
-        return "Active"
+        return "Checked in" if self.checked_in_at else "Active"
 
 class EntryRequest(db.Model):
     __tablename__ = 'entry_requests'

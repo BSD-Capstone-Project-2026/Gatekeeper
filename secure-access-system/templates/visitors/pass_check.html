@@ -1,7 +1,7 @@
 {% extends "visitors/_layout.html" %}
 {% block title %}Pass Check - Gatekeeper{% endblock %}
 {% block heading %}Visitors{% endblock %}
-{% block description %}Scan or type a visitor's pass code to admit them through the main entrance.{% endblock %}
+{% block description %}Look up a visitor's pass, confirm their name and host with them, then admit them through the main entrance.{% endblock %}
 
 {% block tab %}
 <div class="row g-4">
@@ -14,13 +14,35 @@
             </div>
         </form>
 
-        {% if result %}
-        <div class="result-card {{ 'is-ok' if result.ok else 'is-denied' }} mt-3" role="status">
-            <i class="bi bi-{{ 'check-circle-fill' if result.ok else 'x-circle-fill' }}"></i>
+        {% if result and result.state == 'verify' %}
+        <form class="card verify-card mt-3" method="POST" action="{{ url_for('visitors.admit_pass', pass_id=result.pass.id) }}">
+            <div class="card-body">
+                <div class="verify-head">
+                    <span class="request-avatar">{{ result.title[:1] }}</span>
+                    <div>
+                        <div class="result-title">{{ result.title }}</div>
+                        <div class="text-muted">{{ result.detail }}</div>
+                    </div>
+                </div>
+                <div class="inset-group">
+                    <div class="inset-row"><span>Pass code</span><div class="pass-code ms-auto">{{ result.pass.code }}</div></div>
+                    <div class="inset-row"><span>Valid until</span><div class="ms-auto"><time data-local datetime="{{ result.pass.valid_until.isoformat() }}Z"></time></div></div>
+                    {% if result.pass.checked_in_at %}<div class="inset-row"><span>Last check-in</span><div class="ms-auto"><time data-local datetime="{{ result.pass.checked_in_at.isoformat() }}Z"></time></div></div>{% endif %}
+                </div>
+                <p class="verify-prompt"><i class="bi bi-person-check"></i>Ask the visitor to say their name and who they are visiting before you admit them.</p>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-secondary btn-lg flex-fill" href="{{ url_for('visitors.passes') }}">Cancel</a>
+                    <button class="btn btn-primary btn-lg flex-fill" type="submit">Admit</button>
+                </div>
+            </div>
+        </form>
+        {% elif result %}
+        <div class="result-card {{ 'is-ok' if result.state == 'admitted' else 'is-denied' }} mt-3" role="status">
+            <i class="bi bi-{{ 'check-circle-fill' if result.state == 'admitted' else 'x-circle-fill' }}"></i>
             <div>
                 <div class="result-title">{{ result.title }}</div>
                 <div class="result-detail">{{ result.detail }}</div>
-                {% if result.ok %}<div class="result-detail">Main entrance · valid until <time data-local datetime="{{ result.until.isoformat() }}Z"></time></div>{% endif %}
+                {% if result.until %}<div class="result-detail">Main entrance · pass valid until <time data-local datetime="{{ result.until.isoformat() }}Z"></time></div>{% endif %}
             </div>
         </div>
         {% endif %}

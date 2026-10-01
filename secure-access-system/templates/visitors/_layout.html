@@ -8,7 +8,7 @@
 {% set role = session.user_role %}
 {% set staff = role in ['concierge', 'management'] %}
 {% set visitor_tabs = [
-    ('visitors.passes', 'qr-code', 'Pass Check' if staff else 'Passes', True, ['visitors.passes', 'visitors.create_pass', 'visitors.check_pass']),
+    ('visitors.passes', 'qr-code', 'Pass Check' if staff else 'Passes', True, ['visitors.passes', 'visitors.create_pass', 'visitors.check_pass', 'visitors.admit_pass']),
     ('visitors.lobby', 'bell', 'Lobby', True, ['visitors.lobby']),
     ('visitors.parking', 'car-front', 'Parking', True, ['visitors.parking', 'visitors.create_permit']),
     ('visitors.watchlist', 'shield-x', 'Watchlist', staff, ['visitors.watchlist', 'visitors.add_to_watchlist'])

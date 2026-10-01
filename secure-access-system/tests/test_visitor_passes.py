@@ -43,14 +43,28 @@ def test_pass_limited_to_seven_days(client, resident, days, ok):
     assert (VisitorPass.query.count() == 1) is ok
 
 
-def test_valid_pass_admits_and_logs_visitor(client, resident, make_user, login, main_door):
+def test_concierge_verifies_then_admits_and_logs_visitor(client, resident, make_user, login, main_door):
     create(client)
-    code = VisitorPass.query.one().code
-    res = check(client, make_user, login, code)
-    assert res.status_code == 200 and b"Admit Sam Lee" in res.data and b"Unit 2A" in res.data
+    visitor_pass = VisitorPass.query.one()
+    res = check(client, make_user, login, visitor_pass.code)
+    assert res.status_code == 200 and b"Visiting resident test" in res.data and b"Unit 2A" in res.data and b"Admit" in res.data
+    assert AccessLog.query.count() == 0
+    res = client.post(f"/visitors/passes/{visitor_pass.id}/admit")
+    assert res.status_code == 200 and b"Sam Lee admitted" in res.data
     log = AccessLog.query.one()
     assert (log.user_id, log.door_id, log.visitor_name, log.success) == (resident.id, main_door.id, "Sam Lee", True)
+    assert db.session.get(VisitorPass, visitor_pass.id).status == "Checked in"
     assert verify_log_chain()["valid"]
+
+
+def test_admit_rechecks_pass(client, resident, make_user, login, main_door):
+    create(client)
+    visitor_pass = VisitorPass.query.one()
+    check(client, make_user, login, visitor_pass.code)
+    visitor_pass.revoked_at = datetime.utcnow()
+    db.session.commit()
+    res = client.post(f"/visitors/passes/{visitor_pass.id}/admit")
+    assert res.status_code == 422 and b"Pass revoked" in res.data and visitor_pass.checked_in_at is None
 
 
 def test_expired_pass_refused(client, resident, make_user, login, main_door):
@@ -82,6 +96,7 @@ def test_residents_see_only_their_own_passes(client, resident, make_user, login)
 def test_only_staff_can_check_and_only_residents_create(client, make_user, login):
     login(make_user())
     assert client.post("/visitors/passes/check", data={"code": "ANYTHING"}).status_code == 403
+    assert client.post("/visitors/passes/1/admit").status_code == 403
     login(make_user("concierge"))
     assert create(client).status_code == 403
     login(make_user("guest", access_expires_at=datetime.utcnow() + timedelta(days=1)))
