@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-2 sidebar p-0">
+            {% include "_sidebar.html" %}
+        </div>
+        <main class="col-md-10 p-4">
+            <div class="page-header">
+                <div>
+                    <h2 class="mb-1">{% block heading %}{% endblock %}</h2>
+                    <p class="text-muted mb-0">{% block description %}{% endblock %}</p>
+                </div>
+                <div class="page-actions">{% block actions %}{% endblock %}</div>
+            </div>
+            {% for message in errors or ([error] if error else []) %}
+            <div class="alert alert-danger" role="alert">{{ message }}</div>
+            {% endfor %}
+            {% if success %}
+            <div class="alert alert-success" role="alert">{{ success }}</div>
+            {% endif %}
+            {% block body %}{% endblock %}
+        </main>
+    </div>
+</div>
+{% endblock %}

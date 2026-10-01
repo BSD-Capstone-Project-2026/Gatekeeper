@@ -35,4 +35,4 @@ def test_seed_is_repeatable(app):
 def test_demo_accounts_can_sign_in(app, client):
     seed_demo("Demo@2026")
     res = client.post("/login", data={"email": f"priya.sharma@{DOMAIN}", "password": "Demo@2026"})
-    assert res.location.endswith("/concierge")
+    assert res.location.endswith("/dashboard")

@@ -1,27 +1,43 @@
-{% extends "base.html" %}
-{% block title %}Incident Details{% endblock %}
-{% block content %}
-<div class="container">
-    <h2>Incident #{{ incident.id }}</h2>
-    <p><strong>Unit:</strong> {{ incident.unit_number }}</p>
-    <p><strong>Trigger Rule:</strong> {{ incident.trigger_rule }}</p>
-    <p><strong>Attempts:</strong> {{ incident.attempt_count }}</p>
-    <p><strong>Time window:</strong> {{ incident.first_attempt_time }} to {{ incident.last_attempt_time }}</p>
-    <h3>Related Events</h3>
-    <table class="table">
-        <thead>
-            <tr><th>Timestamp</th><th>Success</th><th>Failure Reason</th></tr>
-        </thead>
-        <tbody>
-            {% for log in logs %}
-            <tr>
-                <td>{{ log.timestamp }}</td>
-                <td>{{ '❌' if not log.success else '✅' }}</td>
-                <td>{{ log.failure_reason or '-' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <a href="{{ url_for('web.incidents') }}" class="btn btn-secondary">Back</a>
+{% extends "app_base.html" %}
+{% block title %}Incident #{{ incident.id }} - Gatekeeper{% endblock %}
+{% block heading %}Incident #{{ incident.id }}{% endblock %}
+{% block description %}Unit {{ incident.unit_number }} · {{ incident.trigger_rule }}{% endblock %}
+{% block actions %}<a href="{{ url_for('web.incident_list') }}" class="btn btn-secondary">All Incidents</a>{% endblock %}
+
+{% block body %}
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Summary</div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Status</span><span class="badge {{ 'bg-danger' if incident.status == 'open' else 'bg-secondary' }}">{{ incident.status|title }}</span></li>
+                <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Door</span><span>{{ incident.door.name if incident.door else '—' }}</span></li>
+                <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Attempts</span><span>{{ incident.attempt_count }}</span></li>
+                <li class="list-group-item d-flex justify-content-between"><span class="text-muted">First attempt</span><span>{{ incident.first_attempt_time.strftime('%b %d · %H:%M:%S') if incident.first_attempt_time else '—' }}</span></li>
+                <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Last attempt</span><span>{{ incident.last_attempt_time.strftime('%b %d · %H:%M:%S') if incident.last_attempt_time else '—' }}</span></li>
+            </ul>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">Related Events</div>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>Time</th><th>Outcome</th><th>Reason</th></tr></thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>{{ log.timestamp.strftime('%b %d · %H:%M:%S') }}</td>
+                            <td><span class="status-dot {{ 'ok' if log.success else 'fail' }}"></span>{{ 'Success' if log.success else 'Denied' }}</td>
+                            <td class="text-muted">{{ log.failure_reason or '—' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted text-center">No related events.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

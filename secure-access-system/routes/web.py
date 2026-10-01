@@ -6,49 +6,20 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 import secrets
 import string
 from routes.decorators import role_required
-from collections import defaultdict
 from datetime import datetime, timedelta
 import re
 import socket
 import time
 from datetime import datetime, timedelta
-from models import Incident, Notification
+from models import Incident, Notification, RateLimitBlock
 from utils.notifications import notify, send_email
 from utils.log_integrity import verify_log_chain
+from utils.proximity import on_building_network, issue_proximity_token, proximity_verified
 
 # Blueprint for access API (door/elevator)
 access_bp = Blueprint('access', __name__, url_prefix='/api/access')
 start_time = time.time()
 web_bp = Blueprint("web", __name__)
-
-class RateLimiter:
-    def __init__(self, max_attempts=5, window_seconds=60, block_seconds=300):
-        self.max_attempts = max_attempts
-        self.window_seconds = window_seconds
-        self.block_seconds = block_seconds
-        self.attempts = defaultdict(list)  # key: user_id:door_id, value: list of timestamps
-
-    def is_allowed(self, user_id, door_id):
-        key = f"{user_id}:{door_id}"
-        now = datetime.utcnow()
-        # Remove old attempts outside the window
-        self.attempts[key] = [ts for ts in self.attempts[key] if now - ts < timedelta(seconds=self.window_seconds)]
-        if len(self.attempts[key]) >= self.max_attempts:
-            # Check if block period has passed
-            oldest = min(self.attempts[key])
-            if now - oldest < timedelta(seconds=self.block_seconds):
-                return False, f"Rate limit exceeded. Too many attempts. Try again later."
-            else:
-                # Reset after block period
-                self.attempts[key] = []
-        return True, None
-
-    def record_attempt(self, user_id, door_id):
-        key = f"{user_id}:{door_id}"
-        self.attempts[key].append(datetime.utcnow())
-
-# Create a global instance
-rate_limiter = RateLimiter()
 
 # Login required decorator (using sessions)
 def login_required(f):
@@ -91,6 +62,27 @@ def filter_by_dates(query, column, start_date, end_date):
 
 CREATABLE_ROLES = {'management': ['concierge', 'resident', 'guest', 'cleaner'], 'concierge': ['resident', 'guest']}
 DOOR_ROLES = {'main': {'resident', 'concierge', 'management', 'guest', 'cleaner'}, 'common': {'concierge', 'management', 'cleaner'}}
+
+def failure_summary(log):
+    if log.success:
+        return "Success"
+    if log.failure_reason:
+        return log.failure_reason
+    reasons = [label for ok, label in ((log.wifi_verified, "network not trusted"), (log.proximity_verified, "proximity not verified")) if not ok]
+    return ", ".join(reasons) or "permission denied"
+
+def rate_limit_error(user_id, door_id):
+    cfg = current_app.config
+    now = datetime.utcnow()
+    blocked = RateLimitBlock.query.filter(RateLimitBlock.user_id == user_id, RateLimitBlock.door_id == door_id,
+                                          RateLimitBlock.blocked_until > now).first()
+    recent = AccessLog.query.filter(AccessLog.user_id == user_id, AccessLog.door_id == door_id,
+                                    AccessLog.timestamp >= now - timedelta(seconds=cfg["RATE_LIMIT_WINDOW_SECONDS"])).count()
+    if not blocked and recent >= cfg["RATE_LIMIT_ATTEMPTS"]:
+        db.session.add(RateLimitBlock(user_id=user_id, door_id=door_id, blocked_until=now + timedelta(seconds=cfg["RATE_LIMIT_BLOCK_SECONDS"])))
+        db.session.commit()
+        blocked = True
+    return "Rate limit exceeded. Too many attempts. Try again later." if blocked else None
 
 def account_status_error(user):
     if not user.is_active:
@@ -166,7 +158,7 @@ def login():
     session['jwt_token'] = access_token
     session['last_activity'] = time.time()
 
-    return redirect(url_for("web.concierge_dashboard" if user.role == 'concierge' else "web.dashboard"))
+    return redirect(url_for("web.dashboard"))
 
 
 @web_bp.route("/concierge")
@@ -202,7 +194,15 @@ def recent_logs():
 @web_bp.route("/dashboard")
 @login_required
 def dashboard():
-    users = User.query.order_by(User.created_at.desc()).all() if session.get('user_role') in ('management', 'concierge') else []
+    role = session.get('user_role')
+    if role == 'concierge':
+        return front_desk()
+    if role != 'management':
+        return member_home()
+    users = User.query.order_by(User.created_at.desc()).limit(5).all()
+    open_incidents = Incident.query.filter_by(status='open').order_by(Incident.created_at.desc()).all()
+    activity = db.session.query(AccessLog, User, Door).outerjoin(User, AccessLog.user_id == User.id).outerjoin(
+        Door, AccessLog.door_id == Door.id).order_by(AccessLog.timestamp.desc()).limit(6).all()
     total_users = User.query.count()
     active_users = User.query.filter_by(is_active=True).count()
     locked_users = User.query.filter_by(is_locked=True).count()
@@ -214,6 +214,8 @@ def dashboard():
     return render_template(
         "dashboard.html",
         users=users,
+        open_incidents=open_incidents,
+        activity=activity,
         total_users=total_users,
         active_users=active_users,
         locked_users=locked_users,
@@ -221,6 +223,29 @@ def dashboard():
         user_role=user_role,
         user_name=user_name
     )
+
+def front_desk():
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    todays_logs = AccessLog.query.filter(AccessLog.timestamp >= today)
+    doors = Door.query.filter(Door.door_type.in_(['main', 'common']), Door.is_active == True).order_by(Door.name).all()
+    return render_template(
+        "front_desk.html",
+        open_incidents=Incident.query.filter_by(status='open').order_by(Incident.created_at.desc()).all(),
+        doors=doors,
+        unlocked_count=Door.query.filter_by(is_locked=False).count(),
+        entries_today=todays_logs.filter(AccessLog.success == True).count(),
+        denied_today=todays_logs.filter(AccessLog.success == False).count()
+    )
+
+
+def member_home():
+    user = User.query.get(session['user_id'])
+    activity = db.session.query(AccessLog, Door).outerjoin(Door, AccessLog.door_id == Door.id).filter(
+        AccessLog.user_id == user.id).order_by(AccessLog.timestamp.desc()).limit(5).all()
+    notifications = Notification.query.filter_by(user_id=user.id).order_by(Notification.created_at.desc()).limit(3).all()
+    return render_template("home.html", user=user, activity=activity, notifications=notifications,
+                           unread=Notification.query.filter_by(user_id=user.id, is_read=False).count())
+
 
 # Add near the elevator endpoint in routes/web.py
 
@@ -232,8 +257,6 @@ def request_access():
         return jsonify({"error": "No data provided"}), 400
 
     door_id = data.get('door_id')
-    wifi_ssid = data.get('wifi_ssid')
-    proximity = data.get('proximity', False)
 
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
@@ -252,17 +275,12 @@ def request_access():
         db.session.commit()
         return jsonify({"error": "Access denied", "access_granted": False}), 403
 
-    # Rate limiting check (before processing)
-    allowed, message = rate_limiter.is_allowed(user.id, door.id)
-    if not allowed:
-        return jsonify({"error": message, "access_granted": False}), 429
+    rate_error = rate_limit_error(user.id, door.id)
+    if rate_error:
+        return jsonify({"error": rate_error, "access_granted": False}), 429
 
-    # Simulated Wi-Fi check
-    BUILDING_WIFI = "Avengers-x"
-    wifi_ok = (wifi_ssid == BUILDING_WIFI)
-
-    # Simulated proximity
-    proximity_ok = bool(proximity)
+    wifi_ok = on_building_network(request.remote_addr)
+    proximity_ok = proximity_verified(data.get('proximity_token'), door.id)
 
     # Determine if user is allowed by role/unit
     permission = user.role in DOOR_ROLES.get(door.door_type, set()) or (
@@ -283,9 +301,9 @@ def request_access():
         if not permission:
             reasons.append("permission denied")
         if not wifi_ok:
-            reasons.append("wifi mismatch")
+            reasons.append("network not trusted")
         if not proximity_ok:
-            reasons.append("proximity false")
+            reasons.append("proximity not verified")
         if not zone_ok:
             reasons.append("zone restriction")
 
@@ -304,9 +322,6 @@ def request_access():
     )
     db.session.add(log)
     db.session.commit()
-
-    # Record the attempt for rate limiting (after logging)
-    rate_limiter.record_attempt(user.id, door.id)
 
     # Detect repeated failed attempts
     if not success:
@@ -438,7 +453,7 @@ def acknowledge_incident(incident_id):
         incident.acknowledged_by = session['user_id']
         incident.acknowledged_at = datetime.utcnow()
         db.session.commit()
-    return redirect(url_for("web.incident_list"))
+    return redirect(url_for("web.dashboard" if request.form.get("next") == "dashboard" else "web.incident_list"))
 
 @web_bp.route("/emergency-override", methods=["GET", "POST"])
 @login_required
@@ -482,7 +497,8 @@ def dashboard_stats():
         "recent_users": User.query.filter(User.created_at >= week_ago).count(),
         "management_count": User.query.filter_by(role="management").count(),
         "concierge_count": User.query.filter_by(role="concierge").count(),
-        "resident_count": User.query.filter_by(role="resident").count()
+        "resident_count": User.query.filter_by(role="resident").count(),
+        "role_counts": dict(db.session.query(User.role, db.func.count(User.id)).group_by(User.role).all())
     })
 
 @web_bp.route("/api/dashboard/recent-users")
@@ -557,7 +573,7 @@ def set_door_lock(door_id, action):
     db.session.add(AuditLog(user_id=session['user_id'], performed_by=session['user_id'], action=f"door_{action}",
                             door_id=door.id, details=f"Door '{door.name}' {action}ed from the front desk"))
     db.session.commit()
-    return redirect(url_for("web.door_controls"))
+    return redirect(url_for("web.dashboard" if request.form.get("next") == "dashboard" else "web.door_controls"))
 
 @web_bp.route("/doors")
 @login_required
@@ -766,6 +782,17 @@ def simulate():
         jwt_token=session.get("jwt_token")
     )
 
+@access_bp.route('/beacon/<int:door_id>')
+@jwt_required()
+def door_beacon(door_id):
+    if not on_building_network(request.remote_addr):
+        return jsonify({"error": "network not trusted"}), 403
+    door = Door.query.filter_by(id=door_id, is_active=True).first()
+    if not door:
+        return jsonify({"error": "Door not found"}), 404
+    return jsonify({"door_id": door.id, "proximity_token": issue_proximity_token(door.id),
+                    "expires_in": current_app.config["PROXIMITY_TOKEN_SECONDS"]})
+
 @access_bp.route('/elevator/call', methods=['POST'])
 @jwt_required()
 def call_elevator():
@@ -896,14 +923,7 @@ def incidents():
         logs.append(log)
         log.user_name = f"{user.first_name} {user.last_name}" if user else "Unknown"
         log.door_name = door.name if door else "Unknown"
-        log.reason = []
-        if not log.wifi_verified:
-            log.reason.append("Wi‑Fi mismatch")
-        if not log.proximity_verified:
-            log.reason.append("proximity false")
-        if log.success is False and log.wifi_verified and log.proximity_verified:
-            log.reason.append("permission denied")
-        log.reason_str = ", ".join(log.reason) if log.reason else "Success"
+        log.reason_str = failure_summary(log)
 
     return render_template("incidents.html", logs=logs, start_date=start_date, end_date=end_date,
                            door_id=door_id, doors=Door.query.order_by(Door.name).all(), errors=errors)
@@ -920,14 +940,7 @@ def my_incidents():
     for log in logs:
         door = Door.query.get(log.door_id)
         log.door_name = door.name if door else "Unknown"
-        log.reason = []
-        if not log.wifi_verified:
-            log.reason.append("Wi-Fi mismatch")
-        if not log.proximity_verified:
-            log.reason.append("proximity false")
-        if not log.success and log.wifi_verified and log.proximity_verified:
-            log.reason.append("permission denied")
-        log.reason_str = ", ".join(log.reason) if log.reason else "Success"
+        log.reason_str = failure_summary(log)
 
     return render_template("my_incidents.html", logs=logs)
 @web_bp.route("/zones")

@@ -1,51 +1,35 @@
-{% extends "base.html" %}
-{% block title %}Doors{% endblock %}
-{% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-md-2 sidebar p-0">
-            {% include "_sidebar.html" %}
-        </div>
-        <div class="col-md-10 p-4">
-            <h2>Doors</h2>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Location</th>
-                        <th>Type</th>
-                        <th>Associated Unit</th>
-                        <th>Zone</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for door in doors %}
-                    <tr>
-                        <td>{{ door.id }}</td>
-                        <td>{{ door.name }}</td>
-                        <td>{{ door.location }}</td>
-                        <td>{{ door.door_type }}</td>
-                        <td>{{ door.associated_unit or '-' }}</td>
-                        <td>
-                            <form method="POST" action="{{ url_for('web.assign_door_zone', door_id=door.id) }}">
-                                <select name="zone_id" onchange="this.form.submit()">
-                                    <option value="">-- No zone --</option>
-                                    {% for zone in zones %}
-                                    <option value="{{ zone.id }}" {% if door.zone_id == zone.id %}selected{% endif %}>{{ zone.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </form>
-                        </td>
-                        <td>
-                            <!-- other actions if needed -->
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+{% extends "app_base.html" %}
+{% block title %}Doors - Gatekeeper{% endblock %}
+{% block heading %}Doors{% endblock %}
+{% block description %}Assign each door to a zone. Changes save as soon as you pick a zone.{% endblock %}
+
+{% block body %}
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr><th>Door</th><th>Type</th><th>Unit</th><th>Zone</th></tr>
+            </thead>
+            <tbody>
+                {% for door in doors %}
+                <tr>
+                    <td><div class="fw-semibold">{{ door.name }}</div><small class="text-muted">{{ door.location or '—' }}</small></td>
+                    <td>{{ door.door_type|title }}</td>
+                    <td class="text-muted">{{ door.associated_unit or '—' }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('web.assign_door_zone', door_id=door.id) }}">
+                            <select name="zone_id" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Zone for {{ door.name }}">
+                                <option value="">No zone</option>
+                                {% for zone in zones %}
+                                <option value="{{ zone.id }}" {% if door.zone_id == zone.id %}selected{% endif %}>{{ zone.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endblock %}

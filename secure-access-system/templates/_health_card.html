@@ -1,0 +1,30 @@
+<div class="card h-100">
+    <div class="card-header">System Health</div>
+    <ul class="list-group list-group-flush">
+        <li class="list-group-item d-flex justify-content-between align-items-center"><span><i class="bi bi-hdd-stack me-2 text-muted"></i>Server</span><span id="server-status" class="badge bg-secondary">Checking</span></li>
+        <li class="list-group-item d-flex justify-content-between align-items-center"><span><i class="bi bi-database me-2 text-muted"></i>Database</span><span id="db-status" class="badge bg-secondary">Checking</span></li>
+        <li class="list-group-item d-flex justify-content-between align-items-center"><span><i class="bi bi-wifi me-2 text-muted"></i>Network</span><span id="network-status" class="badge bg-secondary">Checking</span></li>
+    </ul>
+</div>
+<script>
+    const HEALTH_CLASSES = {healthy: 'badge bg-success', unknown: 'badge bg-warning', unhealthy: 'badge bg-danger'};
+    const HEALTH_BADGES = {'server-status': 'server', 'db-status': 'database', 'network-status': 'network'};
+
+    function showHealth(data) {
+        Object.entries(HEALTH_BADGES).forEach(([id, key]) => {
+            const state = data[key] || 'unhealthy';
+            const badge = document.getElementById(id);
+            badge.className = HEALTH_CLASSES[state];
+            badge.textContent = state.charAt(0).toUpperCase() + state.slice(1);
+        });
+    }
+
+    function updateHealth() {
+        fetch('/health')
+            .then(res => res.json())
+            .then(showHealth)
+            .catch(() => showHealth({}));
+    }
+    updateHealth();
+    setInterval(updateHealth, 30000);
+</script>

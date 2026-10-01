@@ -190,6 +190,14 @@ def seal_existing_logs():
     db.session.commit()
     return len(logs)
 
+class RateLimitBlock(db.Model):
+    __tablename__ = 'rate_limit_blocks'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    door_id = db.Column(db.Integer, db.ForeignKey('doors.id'), nullable=False)
+    blocked_until = db.Column(db.DateTime, nullable=False)
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 

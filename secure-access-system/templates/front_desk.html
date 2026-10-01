@@ -1,0 +1,129 @@
+{% extends "app_base.html" %}
+{% block title %}Front Desk - Gatekeeper{% endblock %}
+{% block heading %}Front Desk{% endblock %}
+{% block description %}<span id="today"></span> · Alerts, doors and live activity in one place.{% endblock %}
+
+{% block body %}
+<div class="row g-3 mb-3">
+    {% for icon, value, label, tone in [
+        ('bell', open_incidents|length, 'Open alerts', 'danger' if open_incidents else 'success'),
+        ('unlock', unlocked_count, 'Doors unlocked', 'warning' if unlocked_count else 'success'),
+        ('box-arrow-in-right', entries_today, 'Entries today', 'primary'),
+        ('x-octagon', denied_today, 'Denied today', 'danger' if denied_today else 'success')] %}
+    <div class="col-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <span class="stat-icon tone-{{ tone }}"><i class="bi bi-{{ icon }}"></i></span>
+                <div class="stat-value">{{ value }}</div>
+                <div class="text-muted small">{{ label }}</div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Alerts to Handle
+                <a href="{{ url_for('web.incident_list') }}" class="btn btn-sm btn-secondary">All</a>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for inc in open_incidents[:5] %}
+                <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Unit {{ inc.unit_number }} · {{ inc.attempt_count }} failed attempts</div>
+                        <small class="text-muted">{{ inc.created_at.strftime('%b %d · %H:%M') }}</small>
+                    </div>
+                    <form method="POST" action="{{ url_for('web.acknowledge_incident', incident_id=inc.id) }}">
+                        <input type="hidden" name="next" value="dashboard">
+                        <button type="submit" class="btn btn-sm btn-primary">Acknowledge</button>
+                    </form>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">All clear. No open alerts.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <div class="col-xl-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Doors
+                <a href="{{ url_for('web.door_controls') }}" class="btn btn-sm btn-secondary">All Doors</a>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for door in doors %}
+                <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                    <span><i class="bi bi-{{ 'unlock text-warning' if door.is_locked == false else 'lock text-success' }} me-2"></i>{{ door.name }}</span>
+                    <form method="POST" action="{{ url_for('web.set_door_lock', door_id=door.id, action='lock' if door.is_locked == false else 'unlock') }}">
+                        <input type="hidden" name="next" value="dashboard">
+                        <button type="submit" class="btn btn-sm {{ 'btn-primary' if door.is_locked == false else 'btn-secondary' }}">{{ 'Lock' if door.is_locked == false else 'Unlock' }}</button>
+                    </form>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">No shared doors configured.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <div class="col-xl-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Live Activity
+                <a href="{{ url_for('web.concierge_dashboard') }}" class="btn btn-sm btn-secondary">Open</a>
+            </div>
+            <ul class="list-group list-group-flush" id="live-feed">
+                <li class="list-group-item text-muted">Loading…</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="col-xl-4">
+        {% include "_health_card.html" %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('today').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+    function renderFeed(logs) {
+        const feed = document.getElementById('live-feed');
+        feed.replaceChildren();
+        if (!logs.length) {
+            feed.innerHTML = '<li class="list-group-item text-muted">No door activity yet.</li>';
+            return;
+        }
+        logs.slice(0, 8).forEach(log => {
+            const item = document.createElement('li');
+            item.className = 'list-group-item d-flex justify-content-between align-items-center';
+            const door = document.createElement('span');
+            door.innerHTML = `<span class="status-dot ${log.success ? 'ok' : 'fail'}"></span>`;
+            door.append(log.door_name);
+            const meta = document.createElement('small');
+            meta.className = 'text-muted';
+            meta.textContent = `${log.user_name} · ${new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+            item.append(door, meta);
+            feed.append(item);
+        });
+    }
+
+    function refreshFeed() {
+        fetch('/api/recent-logs')
+            .then(response => {
+                if (response.status === 401) window.location.href = '/login?expired=1';
+                return response.json();
+            })
+            .then(data => renderFeed(data.logs))
+            .catch(err => console.error('Error fetching activity:', err));
+    }
+
+    refreshFeed();
+    setInterval(refreshFeed, 5000);
+</script>
+{% endblock %}

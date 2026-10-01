@@ -1,7 +1,6 @@
 import smtplib
 from unittest.mock import patch
 import pytest
-from flask_jwt_extended import create_access_token
 from models import db, Door, Notification
 from utils.notifications import notify
 
@@ -14,28 +13,26 @@ def mail(app):
     app.config["MAIL_SERVER"] = None
 
 
-def trigger_incident(client, resident, stranger):
+def trigger_incident(request_door, resident, stranger):
     door = Door(name="Unit 40A Door", door_type="unit", associated_unit="40A")
     db.session.add(door)
     db.session.commit()
-    token = create_access_token(identity=str(stranger.id), additional_claims={"role": "resident"})
     for _ in range(3):
-        client.post("/api/access/request", json={"door_id": door.id, "wifi_ssid": "Avengers-x", "proximity": True},
-                    headers={"Authorization": f"Bearer {token}"})
+        request_door(stranger, door)
 
 
-def test_incident_creates_resident_notification(client, make_user):
+def test_incident_creates_resident_notification(request_door, make_user):
     resident, stranger = make_user(unit_number="40A"), make_user(unit_number="12B")
-    trigger_incident(client, resident, stranger)
+    trigger_incident(request_door, resident, stranger)
     note = Notification.query.filter_by(user_id=resident.id).one()
     assert note.incident_id is not None and note.status == "queued"
     for field in ["repeated_failed_attempts", "3 failed attempts", "Unit 40A Door", "UTC"]:
         assert field in note.message
 
 
-def test_email_sent_once_when_configured(client, make_user, mail):
+def test_email_sent_once_when_configured(request_door, make_user, mail):
     resident, stranger = make_user(unit_number="40A"), make_user(unit_number="12B")
-    trigger_incident(client, resident, stranger)
+    trigger_incident(request_door, resident, stranger)
     assert mail.return_value.__enter__.return_value.send_message.call_count == 1
     note = Notification.query.one()
     assert note.status == "sent" and note.sent_at is not None

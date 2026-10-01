@@ -34,4 +34,4 @@ def test_history_shows_outcome_badges(make_user, login, client, main_door):
     db.session.commit()
     login(user)
     page = client.get("/profile/incidents").data
-    assert b"badge bg-success\">Unlocked" in page and b"badge bg-danger\">Denied" in page and b"Wi-Fi mismatch" in page
+    assert b"badge bg-success\">Unlocked" in page and b"badge bg-danger\">Denied" in page and b"network not trusted" in page

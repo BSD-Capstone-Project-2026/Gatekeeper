@@ -65,17 +65,12 @@
 
             <details class="card mt-3 settings">
                 <summary class="card-body text-muted">Simulation settings</summary>
-                <div class="card-body pt-0 row g-3 align-items-end">
-                    <div class="col-12 col-sm-6">
-                        <label for="wifiInput" class="form-label">Connected Wi-Fi</label>
-                        <input type="text" id="wifiInput" class="form-control" value="Avengers-x">
+                <div class="card-body pt-0">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="nearDoor" checked>
+                        <label class="form-check-label" for="nearDoor">Near the door</label>
                     </div>
-                    <div class="col-12 col-sm-6">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" role="switch" id="nearDoor" checked>
-                            <label class="form-check-label" for="nearDoor">Near the door</label>
-                        </div>
-                    </div>
+                    <div class="form-text">When on, the page reads the door's beacon before unlocking. The server checks your network itself.</div>
                 </div>
             </details>
         </div>
@@ -114,12 +109,12 @@
     async function callAPI(endpoint, data) {
         try {
             const response = await fetch(endpoint, {
-                method: 'POST',
+                method: data === undefined ? 'GET' : 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${jwtToken}`
                 },
-                body: JSON.stringify(data),
+                body: data === undefined ? undefined : JSON.stringify(data),
                 signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
             });
             setOffline(false);
@@ -142,11 +137,13 @@
 
     async function unlockDoor(doorId, statusId, label) {
         log(`Unlocking ${label.toLowerCase()}…`);
-        const res = await callAPI('/api/access/request', {
-            door_id: doorId,
-            wifi_ssid: document.getElementById('wifiInput').value,
-            proximity: document.getElementById('nearDoor').checked
-        });
+        let proximityToken = null;
+        if (document.getElementById('nearDoor').checked) {
+            const beacon = await callAPI(`/api/access/beacon/${doorId}`);
+            if (!beacon) return;
+            if (beacon.ok) proximityToken = (await beacon.json()).proximity_token;
+        }
+        const res = await callAPI('/api/access/request', { door_id: doorId, proximity_token: proximityToken });
         if (!res) return;
         const data = await res.json();
         if (res.ok) {

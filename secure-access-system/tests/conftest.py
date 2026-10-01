@@ -1,13 +1,13 @@
 import pytest
+from flask_jwt_extended import create_access_token
 from app import create_app
 from config import TestConfig
 from models import db, User, Door
-from routes.web import rate_limiter
+from utils.proximity import issue_proximity_token
 
 
 @pytest.fixture
 def app():
-    rate_limiter.attempts.clear()
     app = create_app(TestConfig)
     with app.app_context():
         yield app
@@ -37,6 +37,15 @@ def login(client):
     def _login(user, password="Passw0rd!"):
         return client.post("/login", data={"email": user.email, "password": password})
     return _login
+
+
+@pytest.fixture
+def request_door(client):
+    def _request(user, door, near=True, **kwargs):
+        token = create_access_token(identity=str(user.id), additional_claims={"role": user.role})
+        payload = {"door_id": door.id, "proximity_token": issue_proximity_token(door.id) if near else None}
+        return client.post("/api/access/request", json=payload, headers={"Authorization": f"Bearer {token}"}, **kwargs)
+    return _request
 
 
 @pytest.fixture

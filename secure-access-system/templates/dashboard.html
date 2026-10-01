@@ -1,224 +1,167 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - Secure Access Management{% endblock %}
+{% block title %}Dashboard - Gatekeeper{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="row">
-        <!-- Sidebar -->
         <div class="col-md-2 sidebar p-0">
             {% include "_sidebar.html" %}
         </div>
 
-        <!-- Main Content -->
         <div class="col-md-10 p-4">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
-                <span class="badge bg-primary">{{ user_name }}</span>
+            <p class="text-muted mb-1" id="today"></p>
+            <h2 class="mb-4">Welcome back, {{ user_name.split(' ')[0] }}</h2>
+
+            <div class="row g-3 mb-3">
+                {% for icon, value, label, tone in [
+                    ('people', total_users, 'Total users', 'primary'),
+                    ('person-check', active_users, 'Active', 'success'),
+                    ('lock', locked_users, 'Locked', 'danger'),
+                    ('person-plus', recent_users, 'New this week', 'warning')] %}
+                <div class="col-6 col-xl-3">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <span class="stat-icon tone-{{ tone }}"><i class="bi bi-{{ icon }}"></i></span>
+                            <div class="stat-value">{{ value }}</div>
+                            <div class="text-muted small">{{ label }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
 
-            <!-- System Health Status -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-body py-2">
-                            <i class="bi bi-activity me-2"></i> System Health:
-                            <span id="server-status" class="badge bg-success ms-2">● Server</span>
-                            <span id="db-status" class="badge bg-success ms-2">● Database</span>
-                            <span id="network-status" class="badge bg-success ms-2">● Network</span>
-                        </div>
-                    </div>
+            <div class="row g-3 mb-3">
+                <div class="col-lg-4">
+                    {% include "_health_card.html" %}
                 </div>
-            </div>
 
-            {% if user_role in ['management', 'concierge'] %}
-            <!-- Stats Cards -->
-            <div class="row g-4 mb-4">
-                <div class="col-md-3">
-                    <div class="card stat-card bg-primary text-white">
-                        <div class="card-body">
-                            <h1 id="totalUsers" class="display-6">{{ total_users }}</h1>
-                            <p class="mb-0">Total Users</p>
+                <div class="col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            Open Incidents
+                            <span class="badge {{ 'bg-danger' if open_incidents else 'bg-success' }}">{{ open_incidents|length }}</span>
+                        </div>
+                        <ul class="list-group list-group-flush">
+                            {% for inc in open_incidents[:4] %}
+                            <li class="list-group-item">
+                                <div class="fw-semibold">Unit {{ inc.unit_number }} · {{ inc.attempt_count }} failed attempts</div>
+                                <small class="text-muted">{{ inc.created_at.strftime('%b %d · %H:%M') }}</small>
+                            </li>
+                            {% else %}
+                            <li class="list-group-item text-muted">All clear. No open incidents.</li>
+                            {% endfor %}
+                        </ul>
+                        <div class="card-body pt-2">
+                            <a href="{{ url_for('web.incident_list') }}" class="btn btn-sm btn-secondary">View Incidents</a>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card stat-card bg-success text-white">
-                        <div class="card-body">
-                            <h1 id="activeUsers" class="display-6">{{ active_users }}</h1>
-                            <p class="mb-0">Active Users</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card stat-card bg-warning text-white">
-                        <div class="card-body">
-                            <h1 id="lockedUsers" class="display-6">{{ locked_users }}</h1>
-                            <p class="mb-0">Locked Users</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card stat-card bg-info text-white">
-                        <div class="card-body">
-                            <h1 id="recentUsers" class="display-6">{{ recent_users }}</h1>
-                            <p class="mb-0">New Users (7d)</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
 
-            <!-- Chart + Quick Actions -->
-            <div class="row g-4">
-                {% if user_role in ['management', 'concierge'] %}
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>User Distribution by Role</h5>
-                        </div>
-                        <div class="card-body">
-                            <canvas id="roleChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Quick Actions</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="list-group">
-                                {% if user_role in ['management', 'concierge'] %}
-                                    <a href="{{ url_for('web.create_user') }}" class="list-group-item list-group-item-action">
-                                        <i class="bi bi-person-plus me-2"></i> Create New User
-                                    </a>
-                                    <a href="{{ url_for('web.users_list') }}" class="list-group-item list-group-item-action">
-                                        <i class="bi bi-people me-2"></i> View Users
-                                    </a>
-                                {% endif %}
-                                {% if user_role == 'management' %}
-                                    <a href="{{ url_for('web.incidents') }}" class="list-group-item list-group-item-action">
-                                        <i class="bi bi-exclamation-triangle"></i> Incidents
-                                    </a>
-                                {% endif %}
-                            </div>
+                <div class="col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-header">Recent Activity</div>
+                        <ul class="list-group list-group-flush">
+                            {% for log, person, door in activity %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span><span class="status-dot {{ 'ok' if log.success else 'fail' }}"></span>{{ door.name if door else 'Unknown door' }}</span>
+                                <small class="text-muted">{{ person.first_name if person else 'Unknown' }} · {{ log.timestamp.strftime('%H:%M') }}</small>
+                            </li>
+                            {% else %}
+                            <li class="list-group-item text-muted">No door activity yet.</li>
+                            {% endfor %}
+                        </ul>
+                        <div class="card-body pt-2">
+                            <a href="{{ url_for('web.concierge_dashboard') }}" class="btn btn-sm btn-secondary">Live Activity</a>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {% if user_role in ['management', 'concierge'] %}
-            <!-- Recent Users Table -->
-            <div class="card mt-4">
-                <div class="card-header d-flex justify-content-between">
-                    <h5>Recent Users</h5>
-                    <a href="{{ url_for('web.users_list') }}" class="btn btn-sm btn-primary">View All</a>
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-header">Users by Role</div>
+                        <div class="card-body">
+                            <canvas id="roleChart" height="220"></canvas>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table id="recentUsersTable" class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Username</th>
-                                    <th>Email</th>
-                                    <th>Role</th>
-                                    <th>Status</th>
-                                    <th>Created</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for user in users[:5] %}
+                <div class="col-lg-8">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            Recent Users
+                            <a href="{{ url_for('web.users_list') }}" class="btn btn-sm btn-secondary">View All</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table id="recentUsersTable" class="table align-middle">
+                                <thead>
+                                    <tr><th>User</th><th>Role</th><th>Status</th><th>Created</th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in users %}
                                     <tr>
-                                        <td>{{ user.username }}</td>
-                                        <td>{{ user.email }}</td>
+                                        <td><div class="fw-semibold">{{ user.first_name }} {{ user.last_name }}</div><small class="text-muted">{{ user.email }}</small></td>
                                         <td>{{ user.role|title }}</td>
                                         <td>
                                             {% if user.is_locked %}
-                                                <span class="badge bg-danger">Locked</span>
+                                            <span class="badge bg-danger">Locked</span>
                                             {% elif not user.is_active %}
-                                                <span class="badge bg-secondary">Inactive</span>
+                                            <span class="badge bg-secondary">Inactive</span>
                                             {% else %}
-                                                <span class="badge bg-success">Active</span>
+                                            <span class="badge bg-success">Active</span>
                                             {% endif %}
                                         </td>
-                                        <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</td>
+                                        <td class="text-muted">{{ user.created_at.strftime('%b %d, %Y') if user.created_at else '—' }}</td>
                                     </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
-            {% endif %}
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (!document.getElementById('roleChart')) return;
-    // Chart for user distribution
-    fetch('/api/dashboard/stats')
-        .then(response => response.json())
-        .then(data => {
-            const ctx = document.getElementById('roleChart').getContext('2d');
+document.getElementById('today').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
-            // Destroy existing chart if it exists (Chart.js v3 method)
-            const existingChart = Chart.getChart(ctx);
-            if (existingChart) {
-                existingChart.destroy();
-            }
+const ROLE_TONES = { management: '--bs-primary-rgb', concierge: '--bs-warning-rgb', resident: '--bs-success-rgb', guest: '--bs-info-rgb', cleaner: '--bs-secondary-rgb' };
+let roleData = null;
 
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Management', 'Concierge', 'Resident'],
-                    datasets: [{
-                        data: [
-                            data.management_count,
-                            data.concierge_count,
-                            data.resident_count
-                        ],
-                        backgroundColor: ['#dc3545', '#ffc107', '#0dcaf0'],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'bottom' }
-                    }
-                }
-            });
-        })
-        .catch(err => console.error('Error loading stats:', err));
-});
+function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
 
-// Health check function
-const HEALTH_CLASSES = {healthy: 'badge bg-success', unknown: 'badge bg-warning', unhealthy: 'badge bg-danger'};
-const HEALTH_BADGES = {'server-status': ['server', 'Server'], 'db-status': ['database', 'Database'], 'network-status': ['network', 'Network']};
-
-function showHealth(data) {
-    Object.entries(HEALTH_BADGES).forEach(([id, [key, label]]) => {
-        const state = data[key] || 'unhealthy';
-        const badge = document.getElementById(id);
-        badge.className = HEALTH_CLASSES[state] + ' ms-2';
-        badge.textContent = `● ${label}${state === 'healthy' ? '' : ' ' + state}`;
+function drawRoleChart() {
+    const canvas = document.getElementById('roleChart');
+    if (!canvas || !roleData) return;
+    Chart.getChart(canvas)?.destroy();
+    const roles = Object.keys(roleData);
+    new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels: roles.map(r => r.charAt(0).toUpperCase() + r.slice(1)),
+            datasets: [{ data: roles.map(r => roleData[r]), backgroundColor: roles.map(r => `rgb(${cssVar(ROLE_TONES[r] || '--bs-secondary-rgb')})`), borderWidth: 0 }]
+        },
+        options: {
+            cutout: '70%',
+            plugins: { legend: { position: 'bottom', labels: { color: cssVar('--app-text-2'), usePointStyle: true, boxWidth: 8 } } }
+        }
     });
 }
 
-function updateHealth() {
-    fetch('/health')
-        .then(res => res.json())
-        .then(showHealth)
-        .catch(() => showHealth({}));
+if (document.getElementById('roleChart')) {
+    fetch('/api/dashboard/stats')
+        .then(response => response.json())
+        .then(data => { roleData = data.role_counts; drawRoleChart(); })
+        .catch(err => console.error('Error loading stats:', err));
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(drawRoleChart));
 }
-updateHealth();
-setInterval(updateHealth, 30000); // refresh every 30 seconds
+
 </script>
-{% endblock %}
 {% endblock %}

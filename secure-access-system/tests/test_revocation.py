@@ -8,7 +8,7 @@ def token_for(user_id, role="resident"):
 
 
 def unlock(client, headers, door):
-    return client.post("/api/access/request", json={"door_id": door.id, "wifi_ssid": "Avengers-x", "proximity": True}, headers=headers)
+    return client.post("/api/access/request", json={"door_id": door.id}, headers=headers)
 
 
 @pytest.mark.parametrize("field, value, reason", [("is_active", False, "account inactive"), ("is_locked", True, "account locked")])

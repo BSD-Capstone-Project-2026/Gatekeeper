@@ -38,8 +38,15 @@ class Config:
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
     MAIL_SENDER = os.environ.get("MAIL_SENDER", "gatekeeper@building.local")
 
+    BUILDING_NETWORKS = [n.strip() for n in os.environ.get("BUILDING_NETWORKS", "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16").split(",")]
+    PROXIMITY_TOKEN_SECONDS = int(os.environ.get("PROXIMITY_TOKEN_SECONDS", 30))
+
     NETWORK_CHECK_HOST = os.environ.get("NETWORK_CHECK_HOST")
     NETWORK_CHECK_PORT = int(os.environ.get("NETWORK_CHECK_PORT", 80))
+
+    RATE_LIMIT_ATTEMPTS = int(os.environ.get("RATE_LIMIT_ATTEMPTS", 5))
+    RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", 60))
+    RATE_LIMIT_BLOCK_SECONDS = int(os.environ.get("RATE_LIMIT_BLOCK_SECONDS", 300))
 
     SESSION_TIMEOUT_MINUTES = int(os.environ.get("SESSION_TIMEOUT_MINUTES", 15))
 

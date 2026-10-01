@@ -1,5 +1,4 @@
 import pytest
-from flask_jwt_extended import create_access_token
 from models import db, Door, Incident, AccessLog
 
 
@@ -12,12 +11,8 @@ def unit_door(app):
 
 
 @pytest.fixture
-def attempt(client, unit_door):
-    def _attempt(user):
-        token = create_access_token(identity=str(user.id), additional_claims={"role": user.role})
-        return client.post("/api/access/request", json={"door_id": unit_door.id, "wifi_ssid": "Avengers-x", "proximity": True},
-                           headers={"Authorization": f"Bearer {token}"})
-    return _attempt
+def attempt(request_door, unit_door):
+    return lambda user: request_door(user, unit_door)
 
 
 @pytest.fixture

@@ -17,9 +17,8 @@ def add_log(user, door, minutes_ago, success):
     db.session.commit()
 
 
-def test_concierge_redirected_to_live_dashboard(make_user, login, client):
-    res = login(make_user("concierge"))
-    assert res.location.endswith("/concierge")
+def test_concierge_can_open_live_dashboard(make_user, login, client):
+    login(make_user("concierge"))
     assert b"Real-Time Door Activity" in client.get("/concierge").data
 
 

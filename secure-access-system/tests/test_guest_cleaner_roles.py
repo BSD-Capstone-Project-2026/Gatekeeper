@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 import pytest
-from flask_jwt_extended import create_access_token
 from models import db, Door, User, AccessLog
 
 TOMORROW = datetime.utcnow() + timedelta(days=1)
@@ -12,12 +11,6 @@ def doors(app):
     db.session.add_all(doors.values())
     db.session.commit()
     return doors
-
-
-def unlock(client, user, door):
-    token = create_access_token(identity=str(user.id), additional_claims={"role": user.role})
-    return client.post("/api/access/request", json={"door_id": door.id, "wifi_ssid": "Avengers-x", "proximity": True},
-                       headers={"Authorization": f"Bearer {token}"})
 
 
 def create(client, **form):
@@ -41,14 +34,14 @@ def test_guest_requires_future_end_date(make_user, login, client, date, error):
 
 
 @pytest.mark.parametrize("role, main, common, unit", [("guest", 200, 403, 403), ("cleaner", 200, 200, 403)])
-def test_door_rights_by_role(client, make_user, doors, role, main, common, unit):
+def test_door_rights_by_role(make_user, doors, request_door, role, main, common, unit):
     user = make_user(role, access_expires_at=TOMORROW)
-    assert [unlock(client, user, doors[t]).status_code for t in ("main", "common", "unit")] == [main, common, unit]
+    assert [request_door(user, doors[t]).status_code for t in ("main", "common", "unit")] == [main, common, unit]
 
 
-def test_expired_guest_denied(client, make_user, doors):
+def test_expired_guest_denied(make_user, doors, request_door):
     guest = make_user("guest", access_expires_at=datetime.utcnow() - timedelta(minutes=1))
-    assert unlock(client, guest, doors["main"]).status_code == 403
+    assert request_door(guest, doors["main"]).status_code == 403
     assert AccessLog.query.filter_by(user_id=guest.id).one().failure_reason == "guest access expired"
 
 

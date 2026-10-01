@@ -14,12 +14,13 @@ def test_every_page_loads_theme_and_stylesheet(client):
     assert b"<style>" not in page
 
 
-@pytest.mark.parametrize("path", ["/dashboard", "/users", "/create-user", "/incidents", "/profile", "/reset-password", "/zones", "/audit"])
-def test_staff_pages_share_one_sidebar(make_user, login, client, path):
+@pytest.mark.parametrize("path, active", [("/dashboard", 1), ("/users", 1), ("/create-user", 1), ("/incidents", 1), ("/zones", 1), ("/audit", 1),
+                                          ("/profile", 0), ("/reset-password", 0)])
+def test_staff_pages_share_one_sidebar(make_user, login, client, path, active):
     login(make_user("management"))
     page = client.get(path).data.decode()
-    assert page.count('class="app-nav"') == 1
-    assert len(re.findall(r'app-nav-link active', page)) == 1
+    assert page.count('class="app-nav"') == 1 and 'class="dropdown app-account"' in page
+    assert len(re.findall(r'app-nav-link active', page)) == active
 
 
 def test_sidebar_links_follow_role(make_user, login, client):

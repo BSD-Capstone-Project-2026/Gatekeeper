@@ -119,19 +119,208 @@ h2 {
     font-size: 1.25rem;
 }
 
-.app-user {
-    padding: 0 0.75rem 0.5rem;
-    color: var(--app-text-2);
-    font-size: 0.8rem;
-}
-
 .app-nav-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
     padding: 1rem 0.75rem 0.35rem;
+    border: 0;
+    background: none;
     color: var(--app-text-2);
     font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+}
+
+.app-nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.app-nav-group.collapsing {
+    transition: height 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.app-chevron {
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+}
+
+.app-nav-section.collapsed .app-chevron {
+    transform: rotate(-90deg);
+}
+
+.app-account-button {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    margin: 0.75rem 0 0.25rem;
+    padding: 0.5rem 0.6rem;
+    border: 0;
+    border-radius: 12px;
+    background: var(--app-fill);
+    color: var(--app-text);
+    text-align: left;
+}
+
+.app-account-button:hover {
+    background: rgba(120, 120, 128, 0.2);
+}
+
+.app-account-button[aria-expanded="true"] .app-chevron {
+    transform: rotate(180deg);
+}
+
+.app-avatar {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--app-accent);
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.app-account-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.2;
+}
+
+.app-account-name {
+    overflow: hidden;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-account-role {
+    color: var(--app-text-2);
+    font-size: 0.75rem;
+}
+
+.dropdown-menu {
+    --bs-dropdown-bg: var(--app-surface);
+    --bs-dropdown-border-color: var(--app-separator);
+    --bs-dropdown-link-color: var(--app-text);
+    --bs-dropdown-link-hover-color: #ffffff;
+    --bs-dropdown-link-hover-bg: var(--app-accent);
+    --bs-dropdown-link-active-bg: var(--app-accent);
+    --bs-dropdown-divider-bg: var(--app-separator);
+    min-width: 13rem;
+    padding: 0.35rem;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
+    font-size: 0.9rem;
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+}
+
+.dropdown-menu.show {
+    animation: menu-in 0.18s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+@keyframes menu-in {
+    from {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 7px;
+}
+
+.dropdown-item i {
+    width: 1rem;
+    text-align: center;
+}
+
+.dropdown-item.text-danger:hover,
+.dropdown-item.text-danger:focus {
+    background: rgb(var(--bs-danger-rgb));
+    color: #ffffff !important;
+}
+
+.dropdown-item:disabled,
+.dropdown-item.disabled {
+    color: var(--app-text-2);
+}
+
+.stat-card .card-body {
+    padding: 1.25rem;
+}
+
+.stat-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 0.75rem;
+    border-radius: 12px;
+    font-size: 1.15rem;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+}
+
+.tone-primary { background: rgba(var(--bs-primary-rgb), 0.12); color: var(--app-accent-text); }
+.tone-success { background: rgba(var(--bs-success-rgb), 0.14); color: var(--app-green-text); }
+.tone-warning { background: rgba(var(--bs-warning-rgb), 0.16); color: var(--app-orange-text); }
+.tone-danger { background: rgba(var(--bs-danger-rgb), 0.12); color: var(--app-red-text); }
+
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 0.5rem;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.status-dot.ok { background: rgb(var(--bs-success-rgb)); }
+.status-dot.fail { background: rgb(var(--bs-danger-rgb)); }
+
+.home-hero .card-body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1.75rem;
+}
+
+.row-new > * {
+    animation: row-flash 2s ease-out;
+}
+
+@keyframes row-flash {
+    from {
+        background-color: rgba(var(--bs-primary-rgb), 0.18);
+    }
+    to {
+        background-color: transparent;
+    }
 }
 
 .app-nav-link {
@@ -163,15 +352,6 @@ h2 {
 
 .app-nav-link.active i {
     color: #ffffff;
-}
-
-.app-nav-link.logout {
-    margin-top: 1rem;
-}
-
-.app-nav-link.logout,
-.app-nav-link.logout i {
-    color: var(--app-red-text);
 }
 
 .card {
@@ -472,6 +652,43 @@ details.settings summary {
     max-width: 520px;
 }
 
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.page-header h2 .badge {
+    font-size: 0.8rem;
+    vertical-align: middle;
+}
+
+.btn-icon {
+    --bs-btn-padding-x: 0.45rem;
+    --bs-btn-padding-y: 0.2rem;
+    --bs-btn-color: var(--app-text-2);
+    --bs-btn-hover-color: var(--app-text);
+    --bs-btn-hover-bg: var(--app-fill);
+    --bs-btn-active-bg: var(--app-fill);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-border-color: transparent;
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.btn-icon[aria-expanded="true"] {
+    background: var(--app-fill);
+    color: var(--app-text);
+}
+
+.form-switch .form-check-input {
+    width: 2.4em;
+    height: 1.3em;
+}
+
 @media (max-width: 767.98px) {
     .sidebar {
         min-height: auto;
@@ -494,8 +711,21 @@ details.settings summary {
     }
 
     .app-nav-section,
-    .app-user {
+    .app-account-text,
+    .app-account-button .app-chevron {
         display: none;
+    }
+
+    .app-nav .app-nav-group,
+    .app-nav .app-nav-group.collapse:not(.show) {
+        display: contents;
+    }
+
+    .app-account-button {
+        width: auto;
+        margin: 0;
+        padding: 0.25rem;
+        background: none;
     }
 
     .app-brand {
@@ -506,7 +736,4 @@ details.settings summary {
         white-space: nowrap;
     }
 
-    .app-nav-link.logout {
-        margin-top: 0;
-    }
 }

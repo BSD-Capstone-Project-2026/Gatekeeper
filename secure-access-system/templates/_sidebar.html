@@ -3,11 +3,11 @@
 {% set management = role == 'management' %}
 {% set sections = [
     ('Overview', [
-        ('web.dashboard', 'speedometer2', 'Dashboard', True),
+        ('web.dashboard', 'speedometer2' if management else 'display' if staff else 'house', 'Dashboard' if management else 'Front Desk' if staff else 'Home', True),
         ('web.concierge_dashboard', 'broadcast', 'Live Activity', staff),
         ('web.incident_list', 'bell', 'Incidents', staff),
         ('web.door_controls', 'unlock', 'Door Controls', staff),
-        ('web.simulate', 'door-open', 'Access', role == 'resident'),
+        ('web.simulate', 'door-open', 'Access', role in ['resident', 'guest', 'cleaner']),
         ('web.my_incidents', 'clock-history', 'Access History', not staff)
     ]),
     ('Manage', [
@@ -20,23 +20,52 @@
     ('Records', [
         ('web.incidents', 'journal-text', 'Access Logs', management),
         ('web.audit_logs', 'journal-check', 'Audit Log', management)
-    ]),
-    ('Account', [
-        ('web.profile', 'person-circle', 'Profile', True),
-        ('web.reset_password', 'key', 'Change Password', True)
     ])
 ] %}
 <nav class="app-nav" aria-label="Main navigation">
     <a class="app-brand" href="{{ url_for('web.dashboard') }}"><i class="bi bi-shield-lock-fill"></i><span>Gatekeeper</span></a>
-    <div class="app-user">{{ session.user_name }} · {{ role|title }}</div>
+
+    <div class="dropdown app-account">
+        <button class="app-account-button" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <span class="app-avatar">{{ (session.user_name or '?')[:1] }}</span>
+            <span class="app-account-text"><span class="app-account-name">{{ session.user_name }}</span><span class="app-account-role">{{ role|title }}</span></span>
+            <i class="bi bi-chevron-down app-chevron"></i>
+        </button>
+        <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ url_for('web.profile') }}"><i class="bi bi-person-circle"></i>Profile</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('web.reset_password') }}"><i class="bi bi-key"></i>Change Password</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" href="{{ url_for('web.logout') }}"><i class="bi bi-box-arrow-right"></i>Sign Out</a></li>
+        </ul>
+    </div>
+
     {% for title, links in sections %}
     {% set visible = links|selectattr('3')|list %}
     {% if visible %}
-    <div class="app-nav-section">{{ title }}</div>
-    {% for endpoint, icon, label, _ in visible %}
-    <a class="app-nav-link{{ ' active' if request.endpoint == endpoint }}" href="{{ url_for(endpoint) }}"><i class="bi bi-{{ icon }}"></i>{{ label }}</a>
-    {% endfor %}
+    {% set section_id = 'nav-' ~ title|lower %}
+    <button class="app-nav-section" type="button" data-bs-toggle="collapse" data-bs-target="#{{ section_id }}" aria-expanded="true" aria-controls="{{ section_id }}">
+        {{ title }}<i class="bi bi-chevron-down app-chevron"></i>
+    </button>
+    <div class="collapse show app-nav-group" id="{{ section_id }}">
+        {% for endpoint, icon, label, _ in visible %}
+        <a class="app-nav-link{{ ' active' if request.endpoint == endpoint }}" href="{{ url_for(endpoint) }}"><i class="bi bi-{{ icon }}"></i>{{ label }}</a>
+        {% endfor %}
+    </div>
     {% endif %}
     {% endfor %}
-    <a class="app-nav-link logout" href="{{ url_for('web.logout') }}"><i class="bi bi-box-arrow-right"></i>Sign Out</a>
 </nav>
+<script>
+    document.querySelectorAll('.app-nav-group').forEach(group => {
+        const key = 'gk-' + group.id;
+        const toggle = document.querySelector(`[data-bs-target="#${group.id}"]`);
+        let collapsed = false;
+        try { collapsed = localStorage.getItem(key) === 'closed'; } catch (e) {}
+        if (collapsed && !group.querySelector('.active')) {
+            group.classList.remove('show');
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.classList.add('collapsed');
+        }
+        group.addEventListener('hide.bs.collapse', () => { try { localStorage.setItem(key, 'closed'); } catch (e) {} });
+        group.addEventListener('show.bs.collapse', () => { try { localStorage.setItem(key, 'open'); } catch (e) {} });
+    });
+</script>

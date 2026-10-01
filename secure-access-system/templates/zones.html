@@ -1,36 +1,37 @@
-{% extends "base.html" %}
-{% block title %}Zones{% endblock %}
-{% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-md-2 sidebar p-0">{% include "_sidebar.html" %}</div>
-        <div class="col-md-10 p-4">
-            <h2>Zones</h2>
-            <a href="{{ url_for('web.create_zone') }}" class="btn btn-primary mb-3">New Zone</a>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for zone in zones %}
-                    <tr>
-                        <td>{{ zone.name }}</td>
-                        <td>{{ zone.description }}</td>
-                        <td>
-                            <a href="{{ url_for('web.edit_zone', zone_id=zone.id) }}" class="btn btn-sm btn-warning">Edit</a>
-                            <form method="POST" action="{{ url_for('web.delete_zone', zone_id=zone.id) }}" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete zone?')">Delete</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+{% extends "app_base.html" %}
+{% block title %}Zones - Gatekeeper{% endblock %}
+{% block heading %}Zones{% endblock %}
+{% block description %}Group doors into areas and grant people access by zone.{% endblock %}
+{% block actions %}<a href="{{ url_for('web.create_zone') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Zone</a>{% endblock %}
+
+{% block body %}
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr><th>Name</th><th>Description</th><th>Doors</th><th class="text-end"></th></tr>
+            </thead>
+            <tbody>
+                {% for zone in zones %}
+                <tr>
+                    <td class="fw-semibold">{{ zone.name }}</td>
+                    <td class="text-muted">{{ zone.description or '—' }}</td>
+                    <td>{{ zone.doors|length }}</td>
+                    <td class="text-end">
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-icon" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="Actions for {{ zone.name }}"><i class="bi bi-three-dots"></i></button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{{ url_for('web.edit_zone', zone_id=zone.id) }}"><i class="bi bi-pencil"></i>Edit</a></li>
+                                <li><form method="POST" action="{{ url_for('web.delete_zone', zone_id=zone.id) }}" onsubmit="return confirm('Delete zone {{ zone.name }}?')"><button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash"></i>Delete</button></form></li>
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-muted text-center">No zones yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endblock %}

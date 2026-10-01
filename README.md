@@ -88,7 +88,7 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 | `/simulate` | ❌ | ❌ | ✅ | ✅ |
 | `/profile`, `/profile/incidents`, `/reset-password` | ✅ | ✅ | ✅ | ✅ |
 
-**Door rights:** main entrance for every role; common doors for management, concierge and cleaners; unit doors only for the resident of that unit. Zone rules apply on top. Guest access ends on the date set at creation.
+**Door rights:** main entrance for every role; common doors for management, concierge and cleaners; unit doors only for the resident of that unit. Zone rules apply on top. Guest access ends on the date set at creation. Every unlock must come from an address in `BUILDING_NETWORKS` and carry a proximity token from the door's beacon (`GET /api/access/beacon/<door_id>`, valid for 30 seconds).
 
 Denied requests return `403` and are recorded in the audit log as `access_denied`.
 

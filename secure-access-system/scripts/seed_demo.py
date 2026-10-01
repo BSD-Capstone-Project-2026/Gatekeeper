@@ -49,7 +49,7 @@ def seed_history(residents, unit_doors, main_door, gym_door, guest, concierge):
                                   success=True, wifi_verified=True, proximity_verified=True, failure_reason=""))
         logs.append(AccessLog(user_id=residents[days_ago % len(residents)].id, door_id=gym_door.id, timestamp=day + timedelta(hours=7),
                               success=days_ago % 3 != 0, wifi_verified=days_ago % 3 != 0, proximity_verified=True,
-                              failure_reason="" if days_ago % 3 else "wifi mismatch"))
+                              failure_reason="" if days_ago % 3 else "network not trusted"))
     target = residents[4]
     attempts = [now - timedelta(minutes=m) for m in (95, 91, 88)]
     logs += [AccessLog(user_id=guest.id, door_id=unit_doors[target.unit_number].id, timestamp=t, success=False, wifi_verified=True,
