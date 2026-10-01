@@ -90,6 +90,7 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 | `/lobby` (lobby kiosk screen) | Public | Public | Public | Public |
 | `/desk/packages` | ✅ | ✅ | Waiting packages on Home | ❌ |
 | `/desk/shift-log` | ✅ | ✅ | ❌ | ❌ |
+| `/desk/keys` | ✅ | ✅ | ❌ | ❌ |
 | `/simulate` | ❌ | ❌ | ✅ | ✅ |
 | `/profile`, `/profile/incidents`, `/reset-password` | ✅ | ✅ | ✅ | ✅ |
 

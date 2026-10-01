@@ -1,0 +1,107 @@
+{% extends "desk/_layout.html" %}
+{% block title %}Keys - Gatekeeper{% endblock %}
+{% block description %}Sign building keys out to contractors and record every return, so each key is always accounted for.{% endblock %}
+{% block actions %}<button class="btn btn-secondary" type="button" data-bs-toggle="modal" data-bs-target="#add-key"><i class="bi bi-plus-lg me-1"></i>Add Key</button>{% endblock %}
+
+{% block tab %}
+{% set pills = {'In': 'bg-success', 'Out': 'bg-primary', 'Overdue': 'bg-danger'} %}
+<div class="card mb-4">
+    <ul class="list-group list-group-flush">
+        {% for k in keys %}
+        {% set loan = k.current_loan %}
+        <li class="list-group-item key-row{{ ' is-overdue' if k.status == 'Overdue' }}">
+            <span class="key-icon"><i class="bi bi-key-fill"></i></span>
+            <div class="key-name">
+                <div class="fw-semibold">{{ k.name }}</div>
+                <small class="text-muted">{{ k.location or 'No location' }}</small>
+            </div>
+            <span class="badge {{ pills[k.status] }}">{{ k.status }}</span>
+            <div class="flex-grow-1 small">
+                {% if loan %}
+                <div class="fw-semibold">{{ loan.contractor }} · {{ loan.company }}</div>
+                <div class="text-muted">{{ loan.purpose }} · due <time data-local datetime="{{ loan.expected_return.isoformat() }}Z"></time> · out by {{ loan.issuer.first_name }}</div>
+                {% else %}
+                <span class="text-muted">At the front desk</span>
+                {% endif %}
+            </div>
+            {% if loan %}
+            <form method="POST" action="{{ url_for('desk.return_key', loan_id=loan.id) }}"><button class="btn btn-sm btn-primary" type="submit">Return</button></form>
+            {% else %}
+            <button class="btn btn-sm btn-secondary" type="button" data-bs-toggle="modal" data-bs-target="#sign-out" data-key="{{ k.name }}" data-action="{{ url_for('desk.sign_out_key', key_id=k.id) }}">Sign Out</button>
+            {% endif %}
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">No keys yet. Add the building's keys to start the register.</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<h6 class="section-title">Recently returned</h6>
+<div class="card">
+    <ul class="list-group list-group-flush">
+        {% for loan in returned %}
+        <li class="list-group-item d-flex flex-wrap justify-content-between gap-2">
+            <span><span class="fw-semibold">{{ loan.key.name }}</span> · {{ loan.contractor }}, {{ loan.company }}</span>
+            <small class="text-muted">Returned <time data-local datetime="{{ loan.returned_at.isoformat() }}Z"></time> · received by {{ loan.receiver.first_name }} {{ loan.receiver.last_name }}</small>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">No returns yet.</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="modal fade" id="sign-out" tabindex="-1" aria-labelledby="sign-out-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content sheet" method="POST" action="{{ url_for('desk.sign_out_key', key_id=error_key) if error_key }}">
+            <div class="sheet-header">
+                <button class="btn btn-link" type="button" data-bs-dismiss="modal">Cancel</button>
+                <h5 class="mb-0" id="sign-out-title">Sign Out {{ (keys|selectattr('id', 'equalto', error_key)|first).name if error_key }}</h5>
+                <button class="btn btn-link fw-semibold" type="submit">Sign Out</button>
+            </div>
+            <div class="modal-body">
+                {% if sheet_error and error_key %}<div class="alert alert-danger py-2" role="alert">{{ sheet_error }}</div>{% endif %}
+                <div class="inset-group">
+                    <label class="inset-row"><span>Contractor</span><input class="form-control" name="contractor" maxlength="80" placeholder="Full name" value="{{ request.form.get('contractor', '') }}" required></label>
+                    <label class="inset-row"><span>Company</span><input class="form-control" name="company" maxlength="80" placeholder="Company" value="{{ request.form.get('company', '') }}" required></label>
+                    <label class="inset-row"><span>Purpose</span><input class="form-control" name="purpose" maxlength="120" placeholder="e.g. HVAC service" value="{{ request.form.get('purpose', '') }}" required></label>
+                    <label class="inset-row"><span>Back by</span><input class="form-control" type="datetime-local" name="expected_return" id="expected-return" required></label>
+                </div>
+                <input type="hidden" name="tz_offset" id="tz-offset">
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="add-key" tabindex="-1" aria-labelledby="add-key-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content sheet" method="POST" action="{{ url_for('desk.add_key') }}">
+            <div class="sheet-header">
+                <button class="btn btn-link" type="button" data-bs-dismiss="modal">Cancel</button>
+                <h5 class="mb-0" id="add-key-title">Add Key</h5>
+                <button class="btn btn-link fw-semibold" type="submit">Add</button>
+            </div>
+            <div class="modal-body">
+                {% if sheet_error and not error_key %}<div class="alert alert-danger py-2" role="alert">{{ sheet_error }}</div>{% endif %}
+                <div class="inset-group">
+                    <label class="inset-row"><span>Name</span><input class="form-control" name="name" maxlength="60" placeholder="e.g. Boiler Room" value="{{ request.form.get('name', '') }}" required></label>
+                    <label class="inset-row"><span>Location</span><input class="form-control" name="location" maxlength="80" placeholder="Optional" value="{{ request.form.get('location', '') }}"></label>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block tab_scripts %}
+<script>
+    const toLocalInput = date => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    document.getElementById('expected-return').value = toLocalInput(new Date(Date.now() + 2 * 3600000));
+    document.getElementById('tz-offset').value = new Date().getTimezoneOffset();
+    document.getElementById('sign-out').addEventListener('show.bs.modal', event => {
+        if (!event.relatedTarget) return;
+        event.target.querySelector('form').action = event.relatedTarget.dataset.action;
+        document.getElementById('sign-out-title').textContent = 'Sign Out ' + event.relatedTarget.dataset.key;
+    });
+    {% if sheet_error %}bootstrap.Modal.getOrCreateInstance(document.getElementById('{{ 'sign-out' if error_key else 'add-key' }}')).show();{% endif %}
+</script>
+{% endblock %}

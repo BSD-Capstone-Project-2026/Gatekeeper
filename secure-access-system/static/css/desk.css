@@ -133,3 +133,35 @@
 .handover-card {
     box-shadow: inset 4px 0 0 rgb(var(--bs-warning-rgb)), var(--app-shadow);
 }
+
+.key-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.85rem 1rem;
+}
+
+.key-row.is-overdue {
+    background: rgba(var(--bs-danger-rgb), 0.06);
+}
+
+.key-icon {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: rgba(var(--bs-primary-rgb), 0.12);
+    color: var(--app-accent-text);
+}
+
+.key-row.is-overdue .key-icon {
+    background: rgba(var(--bs-danger-rgb), 0.14);
+    color: var(--app-red-text);
+}
+
+.key-name {
+    width: 11rem;
+}

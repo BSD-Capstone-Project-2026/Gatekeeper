@@ -331,6 +331,43 @@ class ShiftLogEntry(db.Model):
     author = db.relationship('User', foreign_keys=[author_id])
     acknowledger = db.relationship('User', foreign_keys=[acknowledged_by])
 
+class BuildingKey(db.Model):
+    __tablename__ = 'building_keys'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(60), unique=True, nullable=False)
+    location = db.Column(db.String(80), nullable=True)
+
+    loans = db.relationship('KeyLoan', backref='key', order_by='KeyLoan.signed_out_at.desc()')
+
+    @property
+    def current_loan(self):
+        return next((loan for loan in self.loans if not loan.returned_at), None)
+
+    @property
+    def status(self):
+        loan = self.current_loan
+        if not loan:
+            return "In"
+        return "Overdue" if datetime.utcnow() > loan.expected_return else "Out"
+
+class KeyLoan(db.Model):
+    __tablename__ = 'key_loans'
+
+    id = db.Column(db.Integer, primary_key=True)
+    key_id = db.Column(db.Integer, db.ForeignKey('building_keys.id'), nullable=False)
+    contractor = db.Column(db.String(80), nullable=False)
+    company = db.Column(db.String(80), nullable=False)
+    purpose = db.Column(db.String(120), nullable=False)
+    expected_return = db.Column(db.DateTime, nullable=False)
+    signed_out_at = db.Column(db.DateTime, default=datetime.utcnow)
+    signed_out_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    returned_at = db.Column(db.DateTime, nullable=True)
+    received_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    issuer = db.relationship('User', foreign_keys=[signed_out_by])
+    receiver = db.relationship('User', foreign_keys=[received_by])
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 

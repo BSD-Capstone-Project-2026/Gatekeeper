@@ -2,10 +2,10 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, redirect, render_template, request, session, url_for
 
-from models import db, Package, ShiftLogEntry, User
+from models import db, BuildingKey, KeyLoan, Package, ShiftLogEntry, User
 from routes.decorators import role_required
 from routes.web import login_required
-from routes.visitors import STAFF, resident_units
+from routes.visitors import STAFF, parse_local, resident_units
 from utils.notifications import notify
 
 desk_bp = Blueprint("desk", __name__, url_prefix="/desk")
@@ -109,3 +109,55 @@ def acknowledge_handover(entry_id):
         entry.acknowledged_by = session['user_id']
         db.session.commit()
     return redirect(url_for("web.dashboard"))
+
+
+@desk_bp.route("/keys")
+@login_required
+@role_required(*STAFF)
+def keys(error=None, status=200):
+    returned = KeyLoan.query.filter(KeyLoan.returned_at.isnot(None)).order_by(KeyLoan.returned_at.desc()).limit(10).all()
+    return render_template("desk/keys.html", keys=BuildingKey.query.order_by(BuildingKey.name).all(), returned=returned,
+                           sheet_error=error, error_key=request.view_args.get("key_id")), status
+
+
+@desk_bp.route("/keys", methods=["POST"])
+@login_required
+@role_required(*STAFF)
+def add_key():
+    name = clean(request.form.get("name"), 60)
+    if not name or BuildingKey.query.filter(db.func.lower(BuildingKey.name) == name.lower()).first():
+        return keys(error="Enter a new key name.", status=400)
+    db.session.add(BuildingKey(name=name, location=clean(request.form.get("location"), 80) or None))
+    db.session.commit()
+    return redirect(url_for("desk.keys"))
+
+
+@desk_bp.route("/keys/<int:key_id>/sign-out", methods=["POST"])
+@login_required
+@role_required(*STAFF)
+def sign_out_key(key_id):
+    key = BuildingKey.query.get_or_404(key_id)
+    fields = {name: clean(request.form.get(name), limit) for name, limit in (("contractor", 80), ("company", 80), ("purpose", 120))}
+    try:
+        expected = parse_local(request.form.get("expected_return", ""), request.form.get("tz_offset", type=int) or 0)
+    except ValueError:
+        expected = None
+    if key.current_loan:
+        return keys(error=f"{key.name} is already signed out.", status=400)
+    if not all(fields.values()) or not expected or expected <= datetime.utcnow():
+        return keys(error="Fill in every field and choose a return time in the future.", status=400)
+    db.session.add(KeyLoan(key_id=key.id, expected_return=expected, signed_out_by=session['user_id'], **fields))
+    db.session.commit()
+    return redirect(url_for("desk.keys"))
+
+
+@desk_bp.route("/keys/loans/<int:loan_id>/return", methods=["POST"])
+@login_required
+@role_required(*STAFF)
+def return_key(loan_id):
+    loan = KeyLoan.query.get_or_404(loan_id)
+    if not loan.returned_at:
+        loan.returned_at = datetime.utcnow()
+        loan.received_by = session['user_id']
+        db.session.commit()
+    return redirect(url_for("desk.keys"))
