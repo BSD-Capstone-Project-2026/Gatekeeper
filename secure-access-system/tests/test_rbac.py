@@ -2,7 +2,7 @@ import pytest
 from models import AuditLog, User
 
 STAFF_ONLY = ["/users", "/api/dashboard/stats", "/api/dashboard/recent-users", "/incident-list"]
-MANAGEMENT_ONLY = ["/doors", "/zones", "/incidents", "/emergency-override"]
+MANAGEMENT_ONLY = ["/doors", "/zones", "/incidents", "/emergency-override", "/logs/verify", "/audit"]
 
 
 @pytest.mark.parametrize("path", STAFF_ONLY + MANAGEMENT_ONLY)

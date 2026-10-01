@@ -37,6 +37,8 @@ class Config:
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
     MAIL_SENDER = os.environ.get("MAIL_SENDER", "gatekeeper@building.local")
 
+    SESSION_TIMEOUT_MINUTES = int(os.environ.get("SESSION_TIMEOUT_MINUTES", 15))
+
     INCIDENT_FAILURE_THRESHOLD = 3
     INCIDENT_WINDOW_MINUTES = 10
 

@@ -5,7 +5,10 @@
 {% block content %}
 <div class="container">
     <h2 class="mt-4">🏢 Access Simulation – Unit {{ unit }} (Floor {{ floor }})</h2>
-    
+    <div id="offline-banner" class="alert alert-danger mt-3 d-none" role="alert">
+        <strong>System offline.</strong> The building server cannot be reached, so doors and the elevator are unavailable. Retrying automatically.
+    </div>
+
     <div class="row mt-5">
         <!-- Main Entrance Door -->
         <div class="col-md-4 text-center">
@@ -39,9 +42,9 @@
     
     <div class="row mt-4">
         <div class="col text-center">
-            <button class="btn btn-primary btn-lg me-2" onclick="unlockMainDoor()">Unlock Main Door</button>
-            <button class="btn btn-warning btn-lg me-2" onclick="callElevator()">Call Elevator</button>
-            <button class="btn btn-success btn-lg" onclick="unlockUnitDoor()">Unlock Unit Door</button>
+            <button class="btn btn-primary btn-lg me-2 access-btn" onclick="unlockMainDoor()">Unlock Main Door</button>
+            <button class="btn btn-warning btn-lg me-2 access-btn" onclick="callElevator()">Call Elevator</button>
+            <button class="btn btn-success btn-lg access-btn" onclick="unlockUnitDoor()">Unlock Unit Door</button>
         </div>
     </div>
     
@@ -97,17 +100,45 @@
         logPanel.scrollTop = logPanel.scrollHeight;
     }
     
-    async function callAPI(endpoint, data) {
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${jwtToken}`
-            },
-            body: JSON.stringify(data)
-        });
-        return response;
+    const REQUEST_TIMEOUT_MS = 5000;
+    const HEALTH_POLL_MS = 10000;
+
+    function setOffline(offline) {
+        document.getElementById('offline-banner').classList.toggle('d-none', !offline);
+        document.querySelectorAll('.access-btn').forEach(btn => btn.disabled = offline);
     }
+
+    async function callAPI(endpoint, data) {
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${jwtToken}`
+                },
+                body: JSON.stringify(data),
+                signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+            });
+            setOffline(false);
+            return response;
+        } catch (err) {
+            setOffline(true);
+            log('⚠️ Server unreachable. Check your connection to the building network.', 'error');
+            return null;
+        }
+    }
+
+    async function checkHealth() {
+        try {
+            const res = await fetch('/health', { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+            setOffline(!res.ok);
+        } catch (err) {
+            setOffline(true);
+        }
+    }
+
+    checkHealth();
+    setInterval(checkHealth, HEALTH_POLL_MS);
 
     async function unlockMainDoor() {
         log('Attempting to unlock main door...');
@@ -117,6 +148,7 @@
             wifi_ssid: wifi_ssid,
             proximity: true
         });
+        if (!res) return;
         const data = await res.json();
         if (res.ok) {
             document.getElementById('main-door-status').className = 'badge bg-success p-2 mt-2';
@@ -137,6 +169,7 @@
             wifi_ssid: wifi_ssid,
             proximity: true
         });
+        if (!res) return;
         const data = await res.json();
         if (res.ok) {
             document.getElementById('unit-door-status').className = 'badge bg-success p-2 mt-2';
@@ -155,6 +188,11 @@
         document.getElementById('elevator-status').innerHTML = '⏳ Moving';
         
         const res = await callAPI('/api/access/elevator/call', {});
+        if (!res) {
+            document.getElementById('elevator-status').className = 'badge bg-secondary mt-2';
+            document.getElementById('elevator-status').innerHTML = '⏳ Idle';
+            return;
+        }
         const data = await res.json();
         if (res.ok) {
             let current = 1;

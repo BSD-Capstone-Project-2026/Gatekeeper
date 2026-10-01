@@ -19,6 +19,7 @@
     <a href="{{ url_for('web.list_zones') }}"><i class="bi bi-grid-3x3-gap-fill"></i> Zones</a>
     <a href="{{ url_for('web.list_doors') }}"><i class="bi bi-door-open"></i> Doors</a>
     <a href="{{ url_for('web.incidents') }}"><i class="bi bi-journal-text"></i> Access Logs</a>
+    <a href="{{ url_for('web.audit_logs') }}"><i class="bi bi-journal-check"></i> Audit Log</a>
     {% endif %}
 
     {% if session.user_role == 'resident' %}

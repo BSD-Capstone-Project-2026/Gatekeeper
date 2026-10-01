@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timedelta
 from models import Incident, Notification
 from utils.notifications import notify, send_email
+from utils.log_integrity import verify_log_chain
 
 # Blueprint for access API (door/elevator)
 access_bp = Blueprint('access', __name__, url_prefix='/api/access')
@@ -58,6 +59,21 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+BACKGROUND_ENDPOINTS = {"web.health", "web.recent_logs", "static"}
+
+@web_bp.before_app_request
+def enforce_session_timeout():
+    if 'user_id' not in session:
+        return None
+    now = time.time()
+    if now - session.get('last_activity', now) > current_app.config["SESSION_TIMEOUT_MINUTES"] * 60:
+        session.clear()
+        if request.path.startswith('/api/'):
+            return jsonify({"error": "Session expired"}), 401
+        return redirect(url_for('web.login', expired=1))
+    if request.endpoint not in BACKGROUND_ENDPOINTS:
+        session['last_activity'] = now
+
 def account_status_error(user):
     if not user.is_active:
         return "account inactive"
@@ -87,7 +103,8 @@ def home():
 @web_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
-        return render_template("login.html", success="Password updated. Please log in." if request.args.get("reset") else None)
+        return render_template("login.html", success="Password updated. Please log in." if request.args.get("reset") else None,
+                               error="Session expired due to inactivity. Please log in again." if request.args.get("expired") else None)
 
     email = request.form.get("email")
     password = request.form.get("password")
@@ -127,6 +144,7 @@ def login():
     session['user_name'] = f"{user.first_name} {user.last_name}"
     session['user_email'] = user.email
     session['jwt_token'] = access_token
+    session['last_activity'] = time.time()
 
     return redirect(url_for("web.concierge_dashboard" if user.role == 'concierge' else "web.dashboard"))
 
@@ -407,41 +425,30 @@ def acknowledge_incident(incident_id):
 @login_required
 @role_required('management')
 def emergency_override():
+    doors = Door.query.all()
     if request.method == "GET":
-        doors = Door.query.all()
         return render_template("emergency_override.html", doors=doors)
 
-    # POST: execute override
-    door_id = request.form.get("door_id")
-    reason = request.form.get("reason")
-    confirm = request.form.get("confirm")
-
-    if not door_id or not reason:
-        flash("Door and reason are required.", "error")
-        return redirect(url_for("web.emergency_override"))
-
-    if confirm != "yes":
-        flash("You must confirm the override.", "error")
-        return redirect(url_for("web.emergency_override"))
-
-    door = Door.query.get(door_id)
+    door = Door.query.get(request.form.get("door_id", type=int) or 0)
+    reason = (request.form.get("reason") or "").strip()
     if not door:
-        flash("Door not found.", "error")
-        return redirect(url_for("web.emergency_override"))
+        return render_template("emergency_override.html", doors=doors, error="Select a valid door."), 400
+    if not reason:
+        return render_template("emergency_override.html", doors=doors, error="A reason is required for every override."), 400
+    if request.form.get("confirm") != "yes":
+        return render_template("emergency_override.html", doors=doors, error="You must confirm the override."), 400
 
-    # Log the override
-    audit = AuditLog(
-        user_id=session.get('user_id'),
-        action="emergency_override",
-        details=f"Emergency override executed on door '{door.name}' (ID {door.id}). Reason: {reason}",
-        performed_by=session.get('user_id')
-    )
-    db.session.add(audit)
+    user = User.query.get(session['user_id'])
+    if not user.check_password(request.form.get("password") or ""):
+        db.session.add(AuditLog(user_id=user.id, performed_by=user.id, action="override_denied", door_id=door.id,
+                                reason=reason, details="Re-authentication failed"))
+        db.session.commit()
+        return render_template("emergency_override.html", doors=doors, error="Password incorrect. Override refused."), 403
+
+    db.session.add(AuditLog(user_id=user.id, performed_by=user.id, action="emergency_override", door_id=door.id,
+                            reason=reason, details=f"Emergency override executed on door '{door.name}'"))
     db.session.commit()
-
-    # Simulate unlocking (in real system, call hardware API here)
-    flash(f"✅ Emergency override executed for door '{door.name}'. Reason: {reason}", "success")
-    return redirect(url_for("web.dashboard"))
+    return render_template("emergency_override.html", doors=doors, success=f"Emergency override executed for door '{door.name}'.")
 
 # API endpoints for dashboard
 @web_bp.route("/api/dashboard/stats")
@@ -653,12 +660,20 @@ def forgot_password():
 
     return render_template("forgot_password.html", success="If an account exists for that email, a reset link has been sent.")
 
+@web_bp.route("/logs/verify")
+@login_required
+@role_required('management')
+def verify_logs():
+    return jsonify(verify_log_chain())
+
 @web_bp.route("/audit")
 @login_required
 @role_required('management')
 def audit_logs():
-    logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).all()
-    return render_template("audit_logs.html", logs=logs)
+    action = request.args.get('action')
+    query = AuditLog.query.filter_by(action=action) if action else AuditLog.query
+    actions = [a for (a,) in db.session.query(AuditLog.action).distinct().order_by(AuditLog.action)]
+    return render_template("audit_logs.html", logs=query.order_by(AuditLog.timestamp.desc()).all(), actions=actions, action=action)
 
 @web_bp.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password_with_token(token):

@@ -83,7 +83,7 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 | `/users/<id>/zones`, `/zones/*`, `/doors/*` | ✅ | ❌ | ❌ |
 | `/incident-list`, `/incidents/<id>/acknowledge` (POST) | ✅ | ✅ | ❌ |
 | `/incidents`, `/incidents/<id>`, `/audit` | ✅ | ❌ | ❌ |
-| `/emergency-override` | ✅ | ❌ | ❌ |
+| `/emergency-override`, `/logs/verify` | ✅ | ❌ | ❌ |
 | `/simulate` | ❌ | ❌ | ✅ |
 | `/profile`, `/profile/incidents`, `/reset-password` | ✅ | ✅ | ✅ |
 

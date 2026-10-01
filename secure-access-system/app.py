@@ -5,7 +5,7 @@ from flask import Flask
 from flask_jwt_extended import JWTManager
 from flask_login import LoginManager
 from config import Config
-from models import db, User, Door, Zone, AccessLog, AccessLogArchive, add_missing_columns
+from models import db, User, Door, Zone, AccessLog, AccessLogArchive, add_missing_columns, seal_existing_logs
 from routes.web import access_bp, web_bp
 from routes.auth import auth_bp
 from routes.users import users_bp
@@ -81,6 +81,7 @@ def create_app(config=Config):
     with app.app_context():
         db.create_all()
         add_missing_columns()
+        seal_existing_logs()
         if app.config.get("TESTING"):
             return app
 

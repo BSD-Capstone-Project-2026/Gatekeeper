@@ -51,7 +51,10 @@
 
     function fetchLogs() {
         fetch('/api/recent-logs' + (cursor ? '?since=' + encodeURIComponent(cursor) : ''))
-            .then(response => response.json())
+            .then(response => {
+                if (response.status === 401) window.location.href = '/login?expired=1';
+                return response.json();
+            })
             .then(data => {
                 const tbody = document.getElementById('log-tbody');
                 if (cursor === null) {

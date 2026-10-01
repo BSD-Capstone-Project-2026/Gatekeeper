@@ -1,6 +1,9 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from sqlalchemy import event, inspect
+from sqlalchemy.orm import Session
 import bcrypt
+import hashlib
 from flask_login import UserMixin
 from utils.encryption import encrypt, decrypt
 
@@ -151,6 +154,37 @@ class AccessLog(db.Model):
     proximity_verified = db.Column(db.Boolean)
     ip_address = db.Column(db.String(45))
     user_agent = db.Column(db.String(200))
+    prev_hash = db.Column(db.String(64))
+    row_hash = db.Column(db.String(64))
+
+    def compute_hash(self):
+        fields = [self.user_id, self.door_id, self.timestamp.isoformat(), self.success, self.failure_reason,
+                  self.wifi_verified, self.proximity_verified, self.ip_address, self.user_agent, self.prev_hash]
+        return hashlib.sha256("|".join(map(str, fields)).encode()).hexdigest()
+
+
+def seal_logs(logs, prev_hash):
+    for log in logs:
+        log.timestamp = log.timestamp or datetime.utcnow()
+        log.prev_hash = prev_hash
+        log.row_hash = prev_hash = log.compute_hash()
+
+
+@event.listens_for(Session, "before_flush")
+def seal_new_access_logs(session, flush_context, instances):
+    new_logs = sorted((o for o in session.new if isinstance(o, AccessLog)), key=lambda o: inspect(o).insert_order)
+    if new_logs:
+        last = session.execute(db.select(AccessLog.row_hash).order_by(AccessLog.id.desc()).limit(1)).scalar()
+        seal_logs(new_logs, last)
+
+
+def seal_existing_logs():
+    if AccessLog.query.filter(AccessLog.row_hash.isnot(None)).first():
+        return 0
+    logs = AccessLog.query.order_by(AccessLog.id).all()
+    seal_logs(logs, None)
+    db.session.commit()
+    return len(logs)
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
@@ -162,6 +196,10 @@ class AuditLog(db.Model):
     reason = db.Column(db.String(200), nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     performed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    door_id = db.Column(db.Integer, db.ForeignKey('doors.id'), nullable=True)
+
+    performer = db.relationship('User', foreign_keys=[performed_by])
+    door = db.relationship('Door')
 
 class AccessLogArchive(db.Model):
     __tablename__ = 'access_logs_archive'
