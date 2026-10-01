@@ -240,7 +240,36 @@ def lobby():
         unit = current_user().unit_number
         pending = pending_for_unit(unit)
         history = EntryRequest.query.filter_by(unit_number=unit).order_by(EntryRequest.created_at.desc()).limit(10).all()
-    return render_template("visitors/lobby.html", pending=pending, history=history)
+    return render_template("visitors/lobby.html", pending=pending, history=history,
+                           host_pass=checked_in_pass(session['user_id']), done=request.args.get("done"),
+                           waiting_pass=valid_passes(session['user_id']).filter(VisitorPass.checked_in_at.is_(None)).first())
+
+
+def valid_passes(resident_id):
+    now = datetime.utcnow()
+    return VisitorPass.query.filter(VisitorPass.resident_id == resident_id, VisitorPass.revoked_at.is_(None),
+                                    VisitorPass.valid_from <= now, VisitorPass.valid_until > now)
+
+
+def checked_in_pass(resident_id):
+    return valid_passes(resident_id).filter(VisitorPass.checked_in_at.isnot(None)).order_by(VisitorPass.checked_in_at.desc()).first()
+
+
+@visitors_bp.route("/visitors/lobby/<any(door, elevator):target>", methods=["POST"])
+@login_required
+@role_required('resident')
+def lobby_control(target):
+    resident = current_user()
+    visitor_pass = checked_in_pass(resident.id)
+    if not visitor_pass:
+        abort(403)
+    if target == 'door':
+        record_visitor_entry(resident, visitor_pass.visitor_name, True)
+    else:
+        db.session.add(AuditLog(user_id=resident.id, performed_by=resident.id, action="elevator_sent",
+                                details=f"Elevator sent to the lobby for {visitor_pass.visitor_name} · floor {resident.floor or '—'}"))
+        db.session.commit()
+    return redirect(url_for("visitors.lobby", done=target))
 
 
 @visitors_bp.route("/visitors/lobby/feed")

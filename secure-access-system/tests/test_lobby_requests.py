@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 import pytest
-from models import db, AccessLog, EntryRequest
+from models import db, AccessLog, AuditLog, EntryRequest, VisitorPass
 
 
 @pytest.fixture
@@ -78,3 +78,45 @@ def test_other_unit_cannot_decide_and_bad_unit_rejected(client, unit_2a, make_us
     login(make_user(unit_number="2B"))
     assert client.post(f"/visitors/lobby/{entry.id}/approve").status_code == 404
     assert ask(client, unit="99Z").status_code == 400
+
+
+def checked_in(resident, minutes_left=60, code="TESTCODE"):
+    now = datetime.utcnow()
+    visitor_pass = VisitorPass(code=code, resident_id=resident.id, visitor_name="Sam Lee", valid_from=now - timedelta(minutes=5),
+                               valid_until=now + timedelta(minutes=minutes_left), checked_in_at=now)
+    db.session.add(visitor_pass)
+    db.session.commit()
+    return visitor_pass
+
+
+def test_controls_locked_without_checked_in_pass(client, unit_2a, login):
+    login(unit_2a)
+    page = client.get("/visitors/lobby").data.decode()
+    assert "Available while one of your visitors is checked in" in page and "Open Lobby Screen" not in page
+    checked_in(unit_2a).checked_in_at = None
+    db.session.commit()
+    assert "These unlock once the front desk checks Sam Lee in" in client.get("/visitors/lobby").data.decode()
+    assert client.post("/visitors/lobby/door").status_code == 403
+    assert client.post("/visitors/lobby/elevator").status_code == 403
+
+
+def test_host_opens_lobby_door_and_sends_elevator(client, unit_2a, login, main_door):
+    checked_in(unit_2a)
+    login(unit_2a)
+    assert "Lobby door opened" in client.post("/visitors/lobby/door", follow_redirects=True).data.decode()
+    log = AccessLog.query.one()
+    assert (log.user_id, log.door_id, log.visitor_name, log.success) == (unit_2a.id, main_door.id, "Sam Lee", True)
+    assert "Elevator on its way" in client.post("/visitors/lobby/elevator", follow_redirects=True).data.decode()
+    assert AuditLog.query.filter_by(action="elevator_sent", user_id=unit_2a.id).count() == 1
+
+
+def test_controls_end_when_pass_expires_or_is_revoked(client, unit_2a, make_user, login):
+    visitor_pass = checked_in(unit_2a)
+    login(make_user(unit_number="2B"))
+    assert client.post("/visitors/lobby/door").status_code == 403
+    login(unit_2a)
+    visitor_pass.revoked_at = datetime.utcnow()
+    db.session.commit()
+    assert client.post("/visitors/lobby/door").status_code == 403
+    checked_in(unit_2a, minutes_left=-1, code="OTHER")
+    assert client.post("/visitors/lobby/elevator").status_code == 403

@@ -1,10 +1,35 @@
 {% extends "visitors/_layout.html" %}
 {% block title %}Lobby Requests - Gatekeeper{% endblock %}
 {% block heading %}Visitors{% endblock %}
-{% block description %}{% if session.user_role in ['concierge', 'management'] %}Visitors asking for entry at the lobby screen. Residents decide; you can see every request as it happens.{% else %}Visitors at the lobby screen who asked for your unit. Approve to let them in.{% endif %}{% endblock %}
-{% block actions %}<a class="btn btn-secondary" href="{{ url_for('visitors.lobby_screen') }}" target="_blank"><i class="bi bi-display me-1"></i>Open Lobby Screen</a>{% endblock %}
+{% block description %}{% if session.user_role in ['concierge', 'management'] %}Visitors asking for entry at the lobby screen. Residents decide; you can see every request as it happens.{% else %}Open the lobby door and send the elevator for a visitor the front desk has checked in, and answer visitors at the lobby screen.{% endif %}{% endblock %}
+{% block actions %}{% if session.user_role in ['concierge', 'management'] %}<a class="btn btn-secondary" href="{{ url_for('visitors.lobby_screen') }}" target="_blank"><i class="bi bi-display me-1"></i>Open Lobby Screen</a>{% endif %}{% endblock %}
 
 {% block tab %}
+{% if session.user_role == 'resident' %}
+<h6 class="section-title">Building access</h6>
+{% if done and host_pass %}
+<div class="result-card is-ok mb-3" role="status">
+    <i class="bi bi-check-circle-fill"></i>
+    <div>
+        <div class="result-title">{{ 'Lobby door opened' if done == 'door' else 'Elevator on its way' }}</div>
+        <div class="result-detail">{{ 'The main entrance is unlocked' if done == 'door' else 'The elevator is coming down to the lobby' }} for {{ host_pass.visitor_name }}.</div>
+    </div>
+</div>
+{% endif %}
+<div class="control-grid mb-2">
+    {% for target, icon, label, hint in [('door', 'door-open', 'Lobby Door', 'Unlock the main entrance'), ('elevator', 'arrow-down-up', 'Elevator', 'Send it to the lobby')] %}
+    <form method="POST" action="{{ url_for('visitors.lobby_control', target=target) }}">
+        <button class="control-tile" type="submit" {{ 'disabled' if not host_pass }}>
+            <span class="control-icon"><i class="bi bi-{{ icon }}"></i></span>
+            <span class="control-label">{{ label }}</span>
+            <span class="control-hint">{{ hint }}</span>
+        </button>
+    </form>
+    {% endfor %}
+</div>
+<p class="text-muted small mb-4">{% if host_pass %}<i class="bi bi-person-check me-1"></i>{{ host_pass.visitor_name }} was checked in at the front desk · pass valid until <time data-local datetime="{{ host_pass.valid_until.isoformat() }}Z"></time>{% elif waiting_pass %}<i class="bi bi-info-circle me-1"></i>{{ waiting_pass.visitor_name }}'s pass is active. These unlock once the front desk checks {{ waiting_pass.visitor_name }} in at Pass Check.{% else %}Available while one of your visitors is checked in at the front desk with an active pass.{% endif %}</p>
+{% endif %}
+
 <h6 class="section-title">Waiting now</h6>
 {% if pending %}
 <div class="request-list">

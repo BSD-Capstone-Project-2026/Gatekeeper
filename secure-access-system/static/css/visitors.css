@@ -281,6 +281,61 @@
     font-weight: 600;
 }
 
+.control-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.75rem;
+}
+
+.control-tile {
+    display: grid;
+    justify-items: start;
+    gap: 0.15rem;
+    width: 100%;
+    padding: 1.1rem;
+    border: 0;
+    border-radius: 20px;
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow);
+    color: var(--app-text);
+    text-align: left;
+    transition: transform 0.15s ease;
+}
+
+.control-tile:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+.control-tile:disabled {
+    opacity: 0.45;
+}
+
+.control-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 0.6rem;
+    border-radius: 50%;
+    background: rgb(var(--bs-primary-rgb));
+    color: #ffffff;
+    font-size: 1.25rem;
+}
+
+.control-tile:disabled .control-icon {
+    background: var(--app-fill);
+    color: var(--app-text-2);
+}
+
+.control-label {
+    font-weight: 600;
+}
+
+.control-hint {
+    color: var(--app-text-2);
+    font-size: 0.85rem;
+}
+
 .empty-inline .card-body {
     padding: 1.25rem;
 }
