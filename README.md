@@ -85,6 +85,9 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 | `/incident-list`, `/incidents/<id>/acknowledge` (POST) | ✅ | ✅ | ❌ | ❌ |
 | `/incidents`, `/incidents/<id>`, `/audit` | ✅ | ❌ | ❌ | ❌ |
 | `/emergency-override`, `/logs/verify` | ✅ | ❌ | ❌ | ❌ |
+| `/visitors/passes`, `/visitors/lobby`, `/visitors/parking` | Check and search | Check and search | Own passes, requests, permits | ❌ |
+| `/visitors/watchlist` | View and edit | View | ❌ | ❌ |
+| `/lobby` (lobby kiosk screen) | Public | Public | Public | Public |
 | `/simulate` | ❌ | ❌ | ✅ | ✅ |
 | `/profile`, `/profile/incidents`, `/reset-password` | ✅ | ✅ | ✅ | ✅ |
 

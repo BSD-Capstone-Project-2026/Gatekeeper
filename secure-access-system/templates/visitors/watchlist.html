@@ -1,0 +1,63 @@
+{% extends "visitors/_layout.html" %}
+{% block title %}Watchlist - Gatekeeper{% endblock %}
+{% block heading %}Visitors{% endblock %}
+{% block description %}People who may not be admitted as visitors. Passes and lobby requests with these names are refused automatically.{% endblock %}
+{% block actions %}{% if session.user_role == 'management' %}<button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#add-entry"><i class="bi bi-plus-lg me-1"></i>Add to Watchlist</button>{% endif %}{% endblock %}
+
+{% block tab %}
+<form class="search-field mb-3" method="GET" action="{{ url_for('visitors.watchlist') }}" role="search">
+    <i class="bi bi-search"></i>
+    <input class="form-control" name="q" value="{{ search }}" placeholder="Search names" aria-label="Search the watchlist">
+</form>
+
+<div class="card">
+    <ul class="list-group list-group-flush">
+        {% for e in entries %}
+        <li class="list-group-item watch-row">
+            <span class="request-avatar watch-avatar">{{ e.name[:1] }}</span>
+            <div class="flex-grow-1">
+                <div class="fw-semibold">{{ e.name }}</div>
+                <div class="text-muted small">{{ e.reason }}</div>
+            </div>
+            <div class="text-end text-muted small">Added <time data-local datetime="{{ e.created_at.isoformat() }}Z"></time><br>by {{ e.adder.first_name }}</div>
+            {% if session.user_role == 'management' %}
+            <div class="dropdown">
+                <button class="btn btn-sm btn-icon" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Actions for {{ e.name }}"><i class="bi bi-three-dots"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><form method="POST" action="{{ url_for('visitors.remove_from_watchlist', entry_id=e.id) }}" onsubmit="return confirm('Remove {{ e.name }} from the watchlist?')"><button class="dropdown-item text-danger" type="submit"><i class="bi bi-trash"></i>Remove</button></form></li>
+                </ul>
+            </div>
+            {% endif %}
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">{{ 'No names match your search.' if search else 'Nobody is on the watchlist.' }}</li>
+        {% endfor %}
+    </ul>
+</div>
+
+{% if session.user_role == 'management' %}
+<div class="modal fade" id="add-entry" tabindex="-1" aria-labelledby="add-entry-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content sheet" method="POST" action="{{ url_for('visitors.add_to_watchlist') }}">
+            <div class="sheet-header">
+                <button class="btn btn-link" type="button" data-bs-dismiss="modal">Cancel</button>
+                <h5 class="mb-0" id="add-entry-title">Add to Watchlist</h5>
+                <button class="btn btn-link fw-semibold" type="submit">Add</button>
+            </div>
+            <div class="modal-body">
+                {% if sheet_error %}<div class="alert alert-danger py-2" role="alert">{{ sheet_error }}</div>{% endif %}
+                <div class="inset-group">
+                    <label class="inset-row"><span>Name</span><input class="form-control" name="name" maxlength="80" placeholder="Full name" value="{{ request.form.get('name', '') }}" required></label>
+                    <label class="inset-row"><span>Reason</span><input class="form-control" name="reason" maxlength="200" placeholder="Why they are barred" value="{{ request.form.get('reason', '') }}" required></label>
+                </div>
+                <p class="text-muted small mt-2 mb-0">Removing someone later is recorded in the audit log.</p>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block tab_scripts %}
+{% if sheet_error %}<script>bootstrap.Modal.getOrCreateInstance(document.getElementById('add-entry')).show();</script>{% endif %}
+{% endblock %}

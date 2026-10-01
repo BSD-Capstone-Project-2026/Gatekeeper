@@ -256,7 +256,10 @@ def front_desk():
         doors=doors,
         unlocked_count=Door.query.filter_by(is_locked=False).count(),
         entries_today=todays_logs.filter(AccessLog.success == True).count(),
-        denied_today=todays_logs.filter(AccessLog.success == False).count()
+        denied_today=todays_logs.filter(AccessLog.success == False).count(),
+        watchlist_alerts=AuditLog.query.filter(AuditLog.action == 'watchlist_blocked',
+                                               AuditLog.timestamp >= datetime.utcnow() - timedelta(hours=24))
+        .order_by(AuditLog.timestamp.desc()).all()
     )
 
 

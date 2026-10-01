@@ -271,6 +271,18 @@ class ParkingPermit(db.Model):
     def minutes_left(self):
         return max(0, int((self.ends_at - datetime.utcnow()).total_seconds() // 60))
 
+class WatchlistEntry(db.Model):
+    __tablename__ = 'watchlist_entries'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    name_key = db.Column(db.String(80), unique=True, nullable=False)
+    reason = db.Column(db.String(200), nullable=False)
+    added_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    adder = db.relationship('User')
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 

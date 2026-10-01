@@ -379,3 +379,38 @@
     letter-spacing: 0.1em;
     text-align: center;
 }
+
+.search-field {
+    position: relative;
+    max-width: 420px;
+}
+
+.search-field > i {
+    position: absolute;
+    top: 50%;
+    left: 0.85rem;
+    color: var(--app-text-2);
+    transform: translateY(-50%);
+}
+
+.search-field .form-control {
+    padding-left: 2.4rem;
+    border-radius: 12px;
+    background: var(--app-fill);
+    border-color: transparent;
+}
+
+.watch-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+}
+
+.watch-avatar {
+    width: 42px;
+    height: 42px;
+    background: rgba(var(--bs-danger-rgb), 0.12);
+    color: var(--app-red-text);
+    font-size: 1.05rem;
+}

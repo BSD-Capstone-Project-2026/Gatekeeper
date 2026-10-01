@@ -4,6 +4,13 @@
 {% block description %}<span id="today"></span> · Alerts, doors and live activity in one place.{% endblock %}
 
 {% block body %}
+{% for alert in watchlist_alerts %}
+<div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+    <i class="bi bi-shield-x"></i>
+    <div><strong>Watchlisted visitor refused:</strong> {{ alert.details }} · {{ alert.timestamp.strftime('%H:%M') }} UTC</div>
+    <a class="ms-auto alert-link" href="{{ url_for('visitors.watchlist') }}">Watchlist</a>
+</div>
+{% endfor %}
 <div class="row g-3 mb-3">
     {% for icon, value, label, tone in [
         ('bell', open_incidents|length, 'Open alerts', 'danger' if open_incidents else 'success'),
