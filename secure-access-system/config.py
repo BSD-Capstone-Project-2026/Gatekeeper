@@ -59,4 +59,5 @@ class Config:
 
 class TestConfig(Config):
     TESTING = True
+    BCRYPT_ROUNDS = 4
     SQLALCHEMY_DATABASE_URI = "sqlite://"

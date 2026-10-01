@@ -4,6 +4,7 @@ from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session
 import bcrypt
 import hashlib
+from flask import current_app, has_app_context
 from flask_login import UserMixin
 from utils.encryption import encrypt, decrypt
 
@@ -69,7 +70,7 @@ class User(db.Model, UserMixin):
         self._door_code = encrypt(value) if value else None
 
     def set_password(self, password):
-        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt(current_app.config.get("BCRYPT_ROUNDS", 12) if has_app_context() else 12))
         self.password_hash = hashed.decode()
 
     def check_password(self, password):

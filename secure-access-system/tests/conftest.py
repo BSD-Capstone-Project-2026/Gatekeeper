@@ -6,6 +6,22 @@ from models import db, User, Door
 from utils.proximity import issue_proximity_token
 
 
+GROUPS = {
+    "security": {"test_baseline", "test_emergency_override", "test_encryption", "test_log_integrity", "test_password_reset", "test_rate_limit",
+                 "test_rbac", "test_revocation", "test_secrets", "test_server_validation", "test_session_timeout", "test_transactions"},
+    "access": {"test_acknowledge", "test_backup_retention", "test_door_controls", "test_guest_cleaner_roles", "test_incident_detection",
+               "test_incident_filter", "test_live_activity", "test_log_filters", "test_network_health", "test_notifications", "test_offline_indicator"},
+    "visitors": {"test_lobby_requests", "test_parking_permits", "test_visitor_passes", "test_watchlist"}
+}
+
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        for group, files in GROUPS.items():
+            if item.path.stem in files:
+                item.add_marker(group)
+
+
 @pytest.fixture
 def app():
     app = create_app(TestConfig)

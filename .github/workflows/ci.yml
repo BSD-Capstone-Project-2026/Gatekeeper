@@ -8,7 +8,20 @@ on:
 
 jobs:
   test:
+    name: test (${{ matrix.group }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: security
+            marker: security
+          - group: access
+            marker: access
+          - group: visitors
+            marker: visitors
+          - group: interface and other
+            marker: not (security or access or visitors)
     defaults:
       run:
         working-directory: secure-access-system
@@ -20,4 +33,4 @@ jobs:
           cache: pip
           cache-dependency-path: secure-access-system/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
-      - run: pytest -q
+      - run: pytest -q -n auto -m "${{ matrix.marker }}"

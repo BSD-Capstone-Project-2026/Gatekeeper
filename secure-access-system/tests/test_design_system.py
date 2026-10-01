@@ -9,7 +9,7 @@ def test_stylesheet_served_with_light_and_dark_tokens(client):
 
 def test_every_page_loads_theme_and_stylesheet(client):
     page = client.get("/login").data
-    assert b"prefers-color-scheme: dark" in page and b"data-bs-theme" in page
+    assert b'data-bs-theme="light"' in page and b"prefers-color-scheme" not in page
     assert b"bootstrap@5.3" in page and b"css/app.css" in page
     assert b"<style>" not in page
 
