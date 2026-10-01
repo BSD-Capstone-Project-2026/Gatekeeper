@@ -350,6 +350,19 @@ h2 {
     color: var(--app-text);
 }
 
+.nav-badge {
+    min-width: 20px;
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: rgb(var(--bs-danger-rgb));
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 20px;
+    text-align: center;
+}
+
 .app-nav-link.active {
     background: var(--app-accent);
     color: #ffffff;

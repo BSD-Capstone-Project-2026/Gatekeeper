@@ -11,7 +11,8 @@
         ('web.my_incidents', 'clock-history', 'Access History', not staff)
     ]),
     ('Visitors', [
-        ('visitors.passes', 'qr-code', 'Pass Check' if staff else 'Visitor Passes', staff or role == 'resident')
+        ('visitors.passes', 'qr-code', 'Pass Check' if staff else 'Visitor Passes', staff or role == 'resident'),
+        ('visitors.lobby', 'bell', 'Lobby Requests', staff or role == 'resident')
     ]),
     ('Manage', [
         ('web.users_list', 'people', 'Users', staff),
@@ -58,7 +59,7 @@
     </button>
     <div class="collapse show app-nav-group" id="{{ section_id }}">
         {% for endpoint, icon, label, _ in visible %}
-        <a class="app-nav-link{{ ' active' if request.endpoint == endpoint }}" href="{{ url_for(endpoint) }}"><i class="bi bi-{{ icon }}"></i>{{ label }}</a>
+        <a class="app-nav-link{{ ' active' if request.endpoint == endpoint }}" href="{{ url_for(endpoint) }}"><i class="bi bi-{{ icon }}"></i>{{ label }}{% if endpoint == 'visitors.lobby' and lobby_badge %}<span class="nav-badge">{{ lobby_badge }}</span>{% endif %}</a>
         {% endfor %}
     </div>
     {% endif %}

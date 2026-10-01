@@ -226,6 +226,31 @@ class VisitorPass(db.Model):
             return "Scheduled"
         return "Active"
 
+class EntryRequest(db.Model):
+    __tablename__ = 'entry_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(32), unique=True, nullable=False)
+    visitor_name = db.Column(db.String(80), nullable=False)
+    unit_number = db.Column(db.String(10), nullable=False)
+    status = db.Column(db.String(10), default='pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    decided_at = db.Column(db.DateTime, nullable=True)
+    decided_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    decider = db.relationship('User')
+
+    @property
+    def current_status(self):
+        if self.status == 'pending' and datetime.utcnow() > self.expires_at:
+            return 'expired'
+        return self.status
+
+    @property
+    def seconds_left(self):
+        return max(0, int((self.expires_at - datetime.utcnow()).total_seconds()))
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 

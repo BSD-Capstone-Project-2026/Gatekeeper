@@ -33,7 +33,7 @@ def login_required(f):
 
 DEMO_DOMAIN = "gatekeeper.demo"
 
-BACKGROUND_ENDPOINTS = {"web.health", "web.recent_logs", "static"}
+BACKGROUND_ENDPOINTS = {"web.health", "web.recent_logs", "static", "visitors.lobby_feed"}
 
 @web_bp.before_app_request
 def enforce_session_timeout():

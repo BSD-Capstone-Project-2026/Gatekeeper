@@ -211,3 +211,117 @@
     padding: 3rem 1.5rem;
     text-align: center;
 }
+
+.section-title {
+    margin-bottom: 0.75rem;
+    color: var(--app-text-2);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.request-list {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.request-card .card-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+}
+
+.request-card {
+    animation: pass-pop 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.request-avatar {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(var(--bs-primary-rgb), 0.14);
+    color: var(--app-accent-text);
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.empty-inline .card-body {
+    padding: 1.25rem;
+}
+
+.kiosk {
+    display: grid;
+    place-items: center;
+    min-height: 100vh;
+    padding: 2rem;
+    background: radial-gradient(circle at top, rgba(var(--bs-primary-rgb), 0.12), transparent 60%), var(--app-bg);
+}
+
+.kiosk-card {
+    width: 100%;
+    max-width: 480px;
+    padding: 3rem 2.5rem;
+    border-radius: 28px;
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow);
+    text-align: center;
+}
+
+.kiosk-title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+}
+
+.kiosk-sub {
+    margin-bottom: 1.75rem;
+    color: var(--app-text-2);
+    font-size: 1.1rem;
+}
+
+.kiosk-timer {
+    color: var(--app-text-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.pulse {
+    display: grid;
+    place-items: center;
+    width: 88px;
+    height: 88px;
+    margin: 0 auto 1.5rem;
+    border-radius: 50%;
+    background: rgba(var(--bs-primary-rgb), 0.14);
+    color: var(--app-accent-text);
+    font-size: 2rem;
+    animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(var(--bs-primary-rgb), 0.3);
+    }
+    50% {
+        box-shadow: 0 0 0 18px rgba(var(--bs-primary-rgb), 0);
+    }
+}
+
+.kiosk-result > i {
+    display: block;
+    margin-bottom: 1rem;
+    font-size: 4.5rem;
+    animation: pass-pop 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.kiosk-result.is-ok > i {
+    color: rgb(var(--bs-success-rgb));
+}
+
+.kiosk-result.is-denied > i {
+    color: rgb(var(--bs-danger-rgb));
+}
