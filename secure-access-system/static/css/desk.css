@@ -1,0 +1,77 @@
+.quick-log .card-body {
+    display: grid;
+    gap: 0.85rem;
+    padding: 1rem;
+}
+
+.quick-log-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.quick-log-row .form-control {
+    flex: 1 1 220px;
+}
+
+.quick-log-row .unit-input {
+    flex: 0 0 110px;
+    font-weight: 600;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.chip {
+    padding: 0.35rem 0.9rem;
+    border-radius: 999px;
+    background: var(--app-fill);
+    color: var(--app-text);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.btn-check:checked + .chip {
+    background: rgb(var(--bs-primary-rgb));
+    color: #ffffff;
+}
+
+.unit-pill {
+    display: inline-block;
+    min-width: 2.75rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 8px;
+    background: rgba(var(--bs-primary-rgb), 0.12);
+    color: var(--app-accent-text);
+    font-weight: 700;
+    text-align: center;
+}
+
+.package-row {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.85rem 1rem;
+}
+
+.carrier-icon {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: rgba(var(--bs-warning-rgb), 0.18);
+    color: var(--app-orange-text);
+}
+
+.package-row.is-done {
+    opacity: 0.75;
+}

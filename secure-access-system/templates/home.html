@@ -34,6 +34,27 @@
         </div>
     </div>
 
+    {% if user.role == 'resident' %}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-box-seam me-2"></i>Packages</span>
+                {% if packages %}<span class="badge bg-warning">{{ packages|length }} waiting</span>{% endif %}
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for p in packages %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><span class="fw-semibold">{{ p.carrier }}</span> · {{ p.description }}</span>
+                    <small class="text-muted">At the front desk since {{ p.logged_at.strftime('%b %d · %H:%M') }} UTC</small>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">No packages waiting for you.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="col-lg-7">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">

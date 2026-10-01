@@ -88,6 +88,7 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 | `/visitors/passes`, `/visitors/lobby`, `/visitors/parking` | Check and admit passes, approve parking | Check and admit passes, approve parking | Own passes, requests and permits; lobby door and elevator while a visitor is checked in | ❌ |
 | `/visitors/watchlist` | View and edit | View | ❌ | ❌ |
 | `/lobby` (lobby kiosk screen) | Public | Public | Public | Public |
+| `/desk/packages` | ✅ | ✅ | Waiting packages on Home | ❌ |
 | `/simulate` | ❌ | ❌ | ✅ | ✅ |
 | `/profile`, `/profile/incidents`, `/reset-password` | ✅ | ✅ | ✅ | ✅ |
 

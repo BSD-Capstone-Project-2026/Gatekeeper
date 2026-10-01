@@ -300,6 +300,21 @@ class WatchlistEntry(db.Model):
 
     adder = db.relationship('User')
 
+class Package(db.Model):
+    __tablename__ = 'packages'
+
+    id = db.Column(db.Integer, primary_key=True)
+    unit_number = db.Column(db.String(10), nullable=False, index=True)
+    carrier = db.Column(db.String(30), nullable=False)
+    description = db.Column(db.String(120), nullable=False)
+    logged_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    logged_at = db.Column(db.DateTime, default=datetime.utcnow)
+    picked_up_at = db.Column(db.DateTime, nullable=True)
+    released_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    logger = db.relationship('User', foreign_keys=[logged_by])
+    releaser = db.relationship('User', foreign_keys=[released_by])
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 

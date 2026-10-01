@@ -1,0 +1,31 @@
+{% extends "app_base.html" %}
+
+{% block head %}
+<link href="{{ url_for('static', filename='css/visitors.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/desk.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block heading %}Front Desk{% endblock %}
+
+{% block body %}
+{% set staff = session.user_role in ['concierge', 'management'] %}
+{% set desk_tabs = [
+    ('desk.packages', 'box-seam', 'Packages', staff, ['desk.packages', 'desk.log_package'])
+] %}
+<nav class="segmented mb-4" aria-label="Front desk sections">
+    {% for endpoint, icon, label, visible, matches in desk_tabs if visible %}
+    <a class="segmented-item{{ ' active' if request.endpoint in matches }}" href="{{ url_for(endpoint) }}"><i class="bi bi-{{ icon }}"></i>{{ label }}</a>
+    {% endfor %}
+</nav>
+{% block tab %}{% endblock %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.querySelectorAll('time[data-local]').forEach(el => {
+        const date = new Date(el.getAttribute('datetime'));
+        el.textContent = date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    });
+</script>
+{% block tab_scripts %}{% endblock %}
+{% endblock %}

@@ -20,8 +20,10 @@ jobs:
             marker: access
           - group: visitors
             marker: visitors
+          - group: desk
+            marker: desk
           - group: interface and other
-            marker: not (security or access or visitors)
+            marker: not (security or access or visitors or desk)
     defaults:
       run:
         working-directory: secure-access-system

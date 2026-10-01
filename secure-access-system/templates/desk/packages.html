@@ -1,0 +1,71 @@
+{% extends "desk/_layout.html" %}
+{% block title %}Packages - Gatekeeper{% endblock %}
+{% block description %}Log deliveries as they arrive. Residents are notified straight away, and every pickup is recorded.{% endblock %}
+
+{% block tab %}
+<form class="card quick-log mb-4" method="POST" action="{{ url_for('desk.log_package') }}">
+    <div class="card-body">
+        {% if form_error %}<div class="alert alert-danger py-2" role="alert">{{ form_error }}</div>{% endif %}
+        <div class="quick-log-row">
+            <input class="form-control unit-input" name="unit" list="units" maxlength="10" placeholder="Unit" aria-label="Unit" value="{{ request.form.get('unit', '') }}" autocomplete="off" required>
+            <datalist id="units">{% for u in units %}<option value="{{ u }}">{% endfor %}</datalist>
+            <input class="form-control" name="description" maxlength="120" placeholder="Description, e.g. small box" aria-label="Description" value="{{ request.form.get('description', '') }}" required>
+            <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>Log Package</button>
+        </div>
+        <div class="chip-row" role="radiogroup" aria-label="Carrier">
+            {% for c in carriers %}
+            <input class="btn-check" type="radio" name="carrier" id="carrier-{{ loop.index }}" value="{{ c }}" {{ 'checked' if c == request.form.get('carrier', carriers[0]) }}>
+            <label class="chip" for="carrier-{{ loop.index }}">{{ c }}</label>
+            {% endfor %}
+        </div>
+    </div>
+</form>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <h6 class="section-title">Waiting · {{ groups.values()|map('length')|sum }}</h6>
+        {% for unit, items in groups.items() %}
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center gap-2"><span class="unit-pill">{{ unit }}</span>{{ items|length }} package{{ 's' if items|length > 1 }}</div>
+            <ul class="list-group list-group-flush">
+                {% for p in items %}
+                <li class="list-group-item package-row">
+                    <span class="carrier-icon"><i class="bi bi-box-seam"></i></span>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">{{ p.description }}</div>
+                        <small class="text-muted">{{ p.carrier }} · logged <time data-local datetime="{{ p.logged_at.isoformat() }}Z"></time> by {{ p.logger.first_name }}</small>
+                    </div>
+                    <form method="POST" action="{{ url_for('desk.pickup_package', package_id=p.id) }}"><button class="btn btn-sm btn-primary" type="submit">Picked Up</button></form>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% else %}
+        <div class="card empty-inline"><div class="card-body text-muted"><i class="bi bi-check2-circle me-2"></i>No packages waiting.</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="col-lg-5">
+        <h6 class="section-title">History</h6>
+        <form class="search-field mb-3" method="GET" action="{{ url_for('desk.packages') }}" role="search">
+            <i class="bi bi-search"></i>
+            <input class="form-control" name="unit" value="{{ search }}" placeholder="Filter by unit" aria-label="Filter history by unit">
+        </form>
+        <div class="card">
+            <ul class="list-group list-group-flush">
+                {% for p in history %}
+                <li class="list-group-item package-row is-done">
+                    <span class="unit-pill">{{ p.unit_number }}</span>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">{{ p.description }}</div>
+                        <small class="text-muted">{{ p.carrier }} · picked up <time data-local datetime="{{ p.picked_up_at.isoformat() }}Z"></time> · released by {{ p.releaser.first_name }} {{ p.releaser.last_name }}</small>
+                    </div>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">{{ 'No pickups for unit ' ~ search ~ '.' if search else 'No pickups yet.' }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
