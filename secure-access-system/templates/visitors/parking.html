@@ -1,16 +1,20 @@
 {% extends "visitors/_layout.html" %}
 {% block title %}Visitor Parking - Gatekeeper{% endblock %}
 {% block heading %}Visitors{% endblock %}
-{% block description %}Register your visitor's licence plate so they can use visitor parking without a ticket.{% endblock %}
+{% block description %}Request a visitor parking permit. Your visitor shows its code at the front desk and the concierge approves it.{% endblock %}
 
 {% block tab %}
+{% set badges = {'pending': 'bg-warning', 'active': 'bg-success', 'expired': 'bg-secondary', 'lapsed': 'bg-secondary', 'declined': 'bg-danger'} %}
 <div class="row g-4">
     <div class="col-lg-5">
         <form class="card" method="POST" action="{{ url_for('visitors.create_permit') }}">
             <div class="card-body">
-                <h5 class="mb-3">Register a plate</h5>
+                <h5 class="mb-3">Request a permit</h5>
+                {% if error %}<div class="alert alert-danger py-2" role="alert">{{ error }}</div>{% endif %}
+                <label class="form-label" for="visitor-name">Visitor</label>
+                <input class="form-control mb-3" id="visitor-name" name="visitor_name" maxlength="80" placeholder="Full name" value="{{ request.form.get('visitor_name', '') }}" required>
                 <label class="form-label" for="plate">Licence plate</label>
-                <input class="form-control plate-input" id="plate" name="plate" maxlength="12" placeholder="ABCD 123" autocomplete="off" required>
+                <input class="form-control plate-input" id="plate" name="plate" maxlength="12" placeholder="ABCD 123" value="{{ request.form.get('plate', '') }}" autocomplete="off" required>
                 <div class="form-label mt-3">How long</div>
                 <div class="segmented segmented-block" role="radiogroup" aria-label="Permit length">
                     {% for h in hours %}
@@ -18,8 +22,8 @@
                     <label class="segmented-item" for="hours-{{ h }}">{{ h }} hours</label>
                     {% endfor %}
                 </div>
-                <button class="btn btn-primary btn-lg w-100 mt-4" type="submit">Register</button>
-                <p class="text-muted small mt-2 mb-0">You can have up to {{ limit }} active permits at a time.</p>
+                <button class="btn btn-primary btn-lg w-100 mt-4" type="submit">Request Permit</button>
+                <p class="text-muted small mt-2 mb-0">The time starts when the front desk approves it. You can have up to {{ limit }} pending or active permits.</p>
             </div>
         </form>
     </div>
@@ -29,17 +33,24 @@
         <div class="card">
             <ul class="list-group list-group-flush">
                 {% for p in permits %}
-                <li class="list-group-item permit-row{{ ' is-inactive' if not p.is_active }}">
+                {% set state = p.current_status %}
+                <li class="list-group-item permit-row{{ ' is-inactive' if state in ['expired', 'lapsed', 'declined'] }}">
                     <span class="plate">{{ p.plate }}</span>
                     <div class="flex-grow-1">
-                        {% if p.is_active %}
-                        <div class="fw-semibold">{{ p.minutes_left // 60 }} h {{ p.minutes_left % 60 }} min left</div>
-                        {% else %}
-                        <div class="fw-semibold">Expired</div>
-                        {% endif %}
-                        <small class="text-muted">Until <time data-local datetime="{{ p.ends_at.isoformat() }}Z"></time></small>
+                        <div class="fw-semibold">{{ p.visitor_name }}</div>
+                        <small class="text-muted">
+                            {% if state == 'pending' %}Waiting for the front desk · {{ p.hours }} hours
+                            {% elif state == 'active' %}{{ p.minutes_left // 60 }} h {{ p.minutes_left % 60 }} min left
+                            {% elif state == 'lapsed' %}Not approved in time
+                            {% elif state == 'declined' %}Declined by the front desk
+                            {% else %}Ended <time data-local datetime="{{ p.ends_at.isoformat() }}Z"></time>{% endif %}
+                        </small>
+                        {% if state in ['pending', 'active'] %}<div class="pass-code small">{{ p.code }}</div>{% endif %}
                     </div>
-                    <span class="badge {{ 'bg-success' if p.is_active else 'bg-secondary' }}">{{ 'Active' if p.is_active else 'Expired' }}</span>
+                    <span class="badge {{ badges[state] }}">{{ state|title }}</span>
+                    {% if state in ['pending', 'active'] %}
+                    <button class="btn btn-sm btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#permit-{{ p.id }}" aria-label="Show QR code for {{ p.plate }}"><i class="bi bi-qr-code"></i></button>
+                    {% endif %}
                 </li>
                 {% else %}
                 <li class="list-group-item text-muted">No permits yet.</li>
@@ -48,4 +59,20 @@
         </div>
     </div>
 </div>
+
+{% for p in permits if p.current_status in ['pending', 'active'] %}
+<div class="modal fade" id="permit-{{ p.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content sheet text-center">
+            <div class="modal-body p-4">
+                <h5 class="mb-1">{{ p.visitor_name }} · {{ p.plate }}</h5>
+                <p class="text-muted small mb-3">Show this code at the front desk</p>
+                <div class="qr-large"><img src="{{ url_for('visitors.permit_qr', permit_id=p.id) }}" alt="QR code for {{ p.plate }}"></div>
+                <div class="pass-code fs-4 mt-3">{{ p.code }}</div>
+                <button class="btn btn-secondary w-100 mt-3" type="button" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 {% endblock %}

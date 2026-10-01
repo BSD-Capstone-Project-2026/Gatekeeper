@@ -1,43 +1,56 @@
 {% extends "visitors/_layout.html" %}
 {% block title %}Visitor Parking - Gatekeeper{% endblock %}
 {% block heading %}Visitors{% endblock %}
-{% block description %}Check whether a car in visitor parking has a permit and which unit registered it.{% endblock %}
+{% block description %}Look up a visitor's parking code or plate, confirm the details with the driver, then approve the permit.{% endblock %}
 
 {% block tab %}
 <div class="row g-4">
     <div class="col-lg-6">
         <form class="card" method="GET" action="{{ url_for('visitors.parking') }}">
             <div class="card-body">
-                <label class="form-label" for="plate">Licence plate</label>
-                <input class="form-control plate-input" id="plate" name="plate" value="{{ search }}" maxlength="12" placeholder="ABCD 123" autocomplete="off" autofocus required>
-                <button class="btn btn-primary btn-lg w-100 mt-3" type="submit">Search</button>
+                <label class="form-label" for="q">Permit code or licence plate</label>
+                <input class="form-control plate-input" id="q" name="q" value="{{ search }}" maxlength="12" placeholder="e.g. K7PX2M9Q" autocomplete="off" autofocus required>
+                <button class="btn btn-primary btn-lg w-100 mt-3" type="submit">Look Up</button>
             </div>
         </form>
 
         {% if search %}
-        {% set current_match = matches|selectattr('is_active')|first %}
-        {% if current_match %}
+        {% set state = match.current_status if match %}
+        {% if state == 'pending' %}
+        <form class="card verify-card mt-3" method="POST">
+            <div class="card-body">
+                <div class="verify-head">
+                    <span class="plate">{{ match.plate }}</span>
+                    <div>
+                        <div class="result-title">{{ match.visitor_name }}</div>
+                        <div class="text-muted">Visiting {{ match.resident.first_name }} {{ match.resident.last_name }} · Unit {{ match.resident.unit_number or '—' }}</div>
+                    </div>
+                </div>
+                <div class="inset-group">
+                    <div class="inset-row"><span>Permit code</span><div class="pass-code ms-auto">{{ match.code }}</div></div>
+                    <div class="inset-row"><span>Stay</span><div class="ms-auto">{{ match.hours }} hours from approval</div></div>
+                </div>
+                <p class="verify-prompt"><i class="bi bi-person-check"></i>Ask the driver to confirm their name, plate and who they are visiting before you approve.</p>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-secondary btn-lg flex-fill" type="submit" formaction="{{ url_for('visitors.decide_permit', permit_id=match.id, decision='decline') }}">Decline</button>
+                    <button class="btn btn-primary btn-lg flex-fill" type="submit" formaction="{{ url_for('visitors.decide_permit', permit_id=match.id, decision='approve') }}">Approve</button>
+                </div>
+            </div>
+        </form>
+        {% elif state == 'active' %}
         <div class="result-card is-ok mt-3" role="status">
             <i class="bi bi-check-circle-fill"></i>
             <div>
                 <div class="result-title">Active permit</div>
-                <div class="result-detail">{{ current_match.plate }} · Unit {{ current_match.resident.unit_number or '—' }} · until <time data-local datetime="{{ current_match.ends_at.isoformat() }}Z"></time></div>
-            </div>
-        </div>
-        {% elif matches %}
-        <div class="result-card is-denied mt-3" role="status">
-            <i class="bi bi-x-circle-fill"></i>
-            <div>
-                <div class="result-title">Permit expired</div>
-                <div class="result-detail">{{ matches[0].plate }} · Unit {{ matches[0].resident.unit_number or '—' }} · ended <time data-local datetime="{{ matches[0].ends_at.isoformat() }}Z"></time></div>
+                <div class="result-detail">{{ match.plate }} · {{ match.visitor_name }} · Unit {{ match.resident.unit_number or '—' }} · until <time data-local datetime="{{ match.ends_at.isoformat() }}Z"></time></div>
             </div>
         </div>
         {% else %}
         <div class="result-card is-denied mt-3" role="status">
-            <i class="bi bi-question-circle-fill"></i>
+            <i class="bi bi-{{ 'x-circle-fill' if match else 'question-circle-fill' }}"></i>
             <div>
-                <div class="result-title">No permit found</div>
-                <div class="result-detail">No resident has registered {{ search|upper }}.</div>
+                <div class="result-title">{{ {'expired': 'Permit expired', 'lapsed': 'Request not approved in time', 'declined': 'Permit declined'}.get(state, 'No permit found') }}</div>
+                <div class="result-detail">{% if match %}{{ match.plate }} · Unit {{ match.resident.unit_number or '—' }}{% else %}No permit matches {{ search|upper }}.{% endif %}</div>
             </div>
         </div>
         {% endif %}
@@ -45,13 +58,27 @@
     </div>
 
     <div class="col-lg-6">
+        <h6 class="section-title">Waiting for approval</h6>
+        <div class="card mb-4">
+            <ul class="list-group list-group-flush">
+                {% for p in pending %}
+                <li class="list-group-item permit-row">
+                    <span class="plate">{{ p.plate }}</span>
+                    <div class="flex-grow-1"><div class="fw-semibold">{{ p.visitor_name }}</div><small class="text-muted">Unit {{ p.resident.unit_number or '—' }} · {{ p.hours }} hours</small></div>
+                    <a class="btn btn-sm btn-secondary" href="{{ url_for('visitors.parking', q=p.code) }}">Review</a>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">No requests waiting.</li>
+                {% endfor %}
+            </ul>
+        </div>
         <h6 class="section-title">Active now</h6>
         <div class="card">
             <ul class="list-group list-group-flush">
                 {% for p in current %}
                 <li class="list-group-item permit-row">
                     <span class="plate">{{ p.plate }}</span>
-                    <div class="flex-grow-1"><div class="fw-semibold">Unit {{ p.resident.unit_number or '—' }}</div><small class="text-muted">Until <time data-local datetime="{{ p.ends_at.isoformat() }}Z"></time></small></div>
+                    <div class="flex-grow-1"><div class="fw-semibold">{{ p.visitor_name }} · Unit {{ p.resident.unit_number or '—' }}</div><small class="text-muted">Until <time data-local datetime="{{ p.ends_at.isoformat() }}Z"></time></small></div>
                 </li>
                 {% else %}
                 <li class="list-group-item text-muted">No active permits.</li>

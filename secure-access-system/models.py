@@ -262,12 +262,26 @@ class ParkingPermit(db.Model):
     plate_key = db.Column(db.String(12), nullable=False, index=True)
     starts_at = db.Column(db.DateTime, default=datetime.utcnow)
     ends_at = db.Column(db.DateTime, nullable=False)
+    code = db.Column(db.String(12), unique=True, nullable=True)
+    visitor_name = db.Column(db.String(80), nullable=True)
+    hours = db.Column(db.Integer, nullable=True)
+    status = db.Column(db.String(10), default='pending')
+    decided_at = db.Column(db.DateTime, nullable=True)
+    decided_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
-    resident = db.relationship('User')
+    resident = db.relationship('User', foreign_keys=[resident_id])
+
+    @property
+    def current_status(self):
+        if self.status == 'declined':
+            return 'declined'
+        if datetime.utcnow() >= self.ends_at:
+            return 'expired' if self.status == 'approved' else 'lapsed'
+        return 'active' if self.status == 'approved' else 'pending'
 
     @property
     def is_active(self):
-        return datetime.utcnow() < self.ends_at
+        return self.current_status == 'active'
 
     @property
     def minutes_left(self):

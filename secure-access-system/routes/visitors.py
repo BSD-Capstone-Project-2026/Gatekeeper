@@ -24,11 +24,16 @@ def current_user():
     return User.query.get(session['user_id'])
 
 
-def new_pass_code():
+def new_code(model):
     while True:
         code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(8))
-        if not VisitorPass.query.filter_by(code=code).first():
+        if not model.query.filter_by(code=code).first():
             return code
+
+
+def qr_svg(code):
+    image = qrcode.make(code, image_factory=qrcode.image.svg.SvgPathImage, box_size=12, border=2)
+    return Response(image.to_string(encoding="unicode"), mimetype="image/svg+xml")
 
 
 def parse_local(value, offset_minutes):
@@ -97,7 +102,7 @@ def create_pass():
         return pass_error(f"A pass can be valid for at most {MAX_PASS_DAYS} days.")
     if block_if_watchlisted(name, current_user().unit_number, session['user_id']):
         return pass_error(BLOCKED_MESSAGE)
-    visitor_pass = VisitorPass(code=new_pass_code(), resident_id=session['user_id'], visitor_name=name,
+    visitor_pass = VisitorPass(code=new_code(VisitorPass), resident_id=session['user_id'], visitor_name=name,
                                valid_from=valid_from, valid_until=valid_until)
     db.session.add(visitor_pass)
     db.session.commit()
@@ -130,8 +135,7 @@ def revoke_pass(pass_id):
 @login_required
 @role_required('resident')
 def pass_qr(pass_id):
-    image = qrcode.make(own_pass(pass_id).code, image_factory=qrcode.image.svg.SvgPathImage, box_size=12, border=2)
-    return Response(image.to_string(encoding="unicode"), mimetype="image/svg+xml")
+    return qr_svg(own_pass(pass_id).code)
 
 
 @visitors_bp.route("/visitors/passes/check", methods=["POST"])
@@ -304,8 +308,8 @@ def plate_key(plate):
     return "".join(ch for ch in (plate or "").upper() if ch.isalnum())
 
 
-def active_permits(query):
-    return query.filter(ParkingPermit.ends_at > datetime.utcnow())
+def live_permits(query, *statuses):
+    return query.filter(ParkingPermit.status.in_(statuses), ParkingPermit.ends_at > datetime.utcnow())
 
 
 @visitors_bp.route("/visitors/parking")
@@ -313,11 +317,13 @@ def active_permits(query):
 @role_required('resident', *STAFF)
 def parking(error=None, status=200):
     if session['user_role'] in STAFF:
-        search = request.args.get("plate", "")
-        matches = ParkingPermit.query.filter_by(plate_key=plate_key(search)).order_by(ParkingPermit.ends_at.desc()).all() if search else []
-        current = active_permits(ParkingPermit.query).order_by(ParkingPermit.ends_at).all()
-        return render_template("visitors/parking_search.html", search=search, matches=matches, current=current)
-    permits = ParkingPermit.query.filter_by(resident_id=session['user_id']).order_by(ParkingPermit.ends_at.desc()).limit(10).all()
+        search = request.args.get("q", "").strip()
+        match = ParkingPermit.query.filter((ParkingPermit.plate_key == plate_key(search)) | (ParkingPermit.code == search.upper())).order_by(
+            ParkingPermit.id.desc()).first() if search else None
+        pending = live_permits(ParkingPermit.query, 'pending').order_by(ParkingPermit.starts_at).all()
+        current = live_permits(ParkingPermit.query, 'approved').order_by(ParkingPermit.ends_at).all()
+        return render_template("visitors/parking_search.html", search=search, match=match, pending=pending, current=current)
+    permits = ParkingPermit.query.filter_by(resident_id=session['user_id']).order_by(ParkingPermit.id.desc()).limit(10).all()
     return render_template("visitors/parking.html", permits=permits, hours=PERMIT_HOURS, limit=MAX_ACTIVE_PERMITS, error=error), status
 
 
@@ -326,16 +332,44 @@ def parking(error=None, status=200):
 @role_required('resident')
 def create_permit():
     plate = " ".join((request.form.get("plate") or "").upper().split())[:12]
+    name = " ".join((request.form.get("visitor_name") or "").split())[:80]
     hours = request.form.get("hours", type=int)
-    if not plate_key(plate) or hours not in PERMIT_HOURS:
-        return parking(error="Enter a licence plate and choose how long the visitor will stay.", status=400)
-    if active_permits(ParkingPermit.query.filter_by(resident_id=session['user_id'])).count() >= MAX_ACTIVE_PERMITS:
+    if not plate_key(plate) or not name or hours not in PERMIT_HOURS:
+        return parking(error="Enter your visitor's name and licence plate, and choose how long they will stay.", status=400)
+    if live_permits(ParkingPermit.query.filter_by(resident_id=session['user_id']), 'pending', 'approved').count() >= MAX_ACTIVE_PERMITS:
         return parking(error=f"Limit of {MAX_ACTIVE_PERMITS} active permits reached", status=400)
     now = datetime.utcnow()
-    db.session.add(ParkingPermit(resident_id=session['user_id'], plate=plate, plate_key=plate_key(plate),
-                                 starts_at=now, ends_at=now + timedelta(hours=hours)))
+    db.session.add(ParkingPermit(resident_id=session['user_id'], code=new_code(ParkingPermit), visitor_name=name, plate=plate,
+                                 plate_key=plate_key(plate), hours=hours, starts_at=now, ends_at=now + timedelta(hours=hours)))
     db.session.commit()
     return redirect(url_for("visitors.parking"))
+
+
+@visitors_bp.route("/visitors/parking/<int:permit_id>/qr.svg")
+@login_required
+@role_required('resident')
+def permit_qr(permit_id):
+    permit = ParkingPermit.query.get_or_404(permit_id)
+    if permit.resident_id != session['user_id']:
+        abort(404)
+    return qr_svg(permit.code)
+
+
+@visitors_bp.route("/visitors/parking/<int:permit_id>/<any(approve, decline):decision>", methods=["POST"])
+@login_required
+@role_required(*STAFF)
+def decide_permit(permit_id, decision):
+    permit = ParkingPermit.query.get_or_404(permit_id)
+    if permit.current_status == 'pending':
+        now = datetime.utcnow()
+        permit.status = 'approved' if decision == 'approve' else 'declined'
+        permit.decided_at = now
+        permit.decided_by = session['user_id']
+        if decision == 'approve':
+            permit.starts_at = now
+            permit.ends_at = now + timedelta(hours=permit.hours)
+        db.session.commit()
+    return redirect(url_for("visitors.parking", q=permit.code))
 
 
 @visitors_bp.route("/visitors/watchlist")
