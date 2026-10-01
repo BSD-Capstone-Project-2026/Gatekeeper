@@ -34,6 +34,13 @@
         <ul class="dropdown-menu">
             <li><a class="dropdown-item" href="{{ url_for('web.profile') }}"><i class="bi bi-person-circle"></i>Profile</a></li>
             <li><a class="dropdown-item" href="{{ url_for('web.reset_password') }}"><i class="bi bi-key"></i>Change Password</a></li>
+            {% if demo_accounts %}
+            <li><hr class="dropdown-divider"></li>
+            <li><h6 class="dropdown-header">Switch demo account</h6></li>
+            {% for account in demo_accounts if account.id != session.user_id %}
+            <li><form method="POST" action="{{ url_for('web.switch_account', user_id=account.id) }}"><button type="submit" class="dropdown-item"><i class="bi bi-person-badge"></i>{{ account.first_name }} {{ account.last_name }} <small class="text-muted ms-auto">{{ account.role|title }}{% if account.unit_number %} · {{ account.unit_number }}{% endif %}</small></button></form></li>
+            {% endfor %}
+            {% endif %}
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item text-danger" href="{{ url_for('web.logout') }}"><i class="bi bi-box-arrow-right"></i>Sign Out</a></li>
         </ul>

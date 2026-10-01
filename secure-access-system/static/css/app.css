@@ -226,6 +226,11 @@ h2 {
     backdrop-filter: saturate(180%) blur(20px);
 }
 
+.app-account .dropdown-menu {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
 .dropdown-menu.show {
     animation: menu-in 0.18s cubic-bezier(0.25, 0.1, 0.25, 1);
 }

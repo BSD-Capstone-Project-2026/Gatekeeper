@@ -31,6 +31,8 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+DEMO_DOMAIN = "gatekeeper.demo"
+
 BACKGROUND_ENDPOINTS = {"web.health", "web.recent_logs", "static"}
 
 @web_bp.before_app_request
@@ -145,19 +147,39 @@ def login():
     # Successful login
     user.failed_login_attempts = 0
     db.session.commit()
-    
-    access_token = create_access_token(
-        identity=str(user.id),
-        additional_claims={"role": user.role}
-    )
-    
+    start_session(user)
+    return redirect(url_for("web.dashboard"))
+
+
+def start_session(user):
+    session.clear()
     session['user_id'] = user.id
     session['user_role'] = user.role
     session['user_name'] = f"{user.first_name} {user.last_name}"
     session['user_email'] = user.email
-    session['jwt_token'] = access_token
+    session['jwt_token'] = create_access_token(identity=str(user.id), additional_claims={"role": user.role})
     session['last_activity'] = time.time()
 
+
+def demo_switching_enabled():
+    return current_app.config.get("APP_ENV") == "development"
+
+
+@web_bp.app_context_processor
+def inject_demo_accounts():
+    if not demo_switching_enabled() or 'user_id' not in session:
+        return {"demo_accounts": []}
+    return {"demo_accounts": User.query.filter(User.email.like(f"%@{DEMO_DOMAIN}"), User.is_active == True)
+            .order_by(User.role, User.first_name).all()}
+
+
+@web_bp.route("/dev/switch-account/<int:user_id>", methods=["POST"])
+@login_required
+def switch_account(user_id):
+    user = User.query.get_or_404(user_id)
+    if not demo_switching_enabled() or not user.email.endswith(f"@{DEMO_DOMAIN}"):
+        return render_template("error.html", error="Account switching is only available for demo accounts in development."), 403
+    start_session(user)
     return redirect(url_for("web.dashboard"))
 
 
