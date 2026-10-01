@@ -7,23 +7,7 @@
     <div class="row">
         <!-- Sidebar -->
         <div class="col-md-2 sidebar p-0">
-            <div class="p-3">
-                <h5 class="text-center mb-4">{{ user.role|title }}</h5>
-                <hr>
-                <a href="{{ url_for('web.dashboard') }}">
-                    <i class="bi bi-speedometer2"></i> Dashboard
-                </a>
-                <a href="{{ url_for('web.profile') }}" class="active">
-                    <i class="bi bi-person-circle"></i> My Profile
-                </a>
-                <a href="{{ url_for('web.reset_password') }}">
-                    <i class="bi bi-key"></i> Reset Password
-                </a>
-                <hr>
-                <a href="{{ url_for('web.logout') }}" class="text-warning">
-                    <i class="bi bi-box-arrow-left"></i> Logout
-                </a>
-            </div>
+            {% include "_sidebar.html" %}
         </div>
 
         <!-- Main Content -->

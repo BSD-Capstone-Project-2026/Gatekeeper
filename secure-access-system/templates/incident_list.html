@@ -11,6 +11,26 @@
             <h2><i class="bi bi-exclamation-triangle"></i> Security Incidents
                 <span class="badge bg-danger" id="new-alerts">{{ open_count }} new</span>
             </h2>
+
+            {% for error in errors %}
+            <div class="alert alert-danger">{{ error }}</div>
+            {% endfor %}
+
+            <form method="GET" class="row g-3 mb-4">
+                <div class="col-auto">
+                    <label class="form-label" for="start_date">From</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date or '' }}">
+                </div>
+                <div class="col-auto">
+                    <label class="form-label" for="end_date">To</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date or '' }}">
+                </div>
+                <div class="col-auto align-self-end">
+                    <button type="submit" class="btn btn-primary">Filter</button>
+                    <a href="{{ url_for('web.incident_list') }}" class="btn btn-secondary">Clear</a>
+                </div>
+            </form>
+
             {% if incidents %}
             <table class="table">
                 <thead>

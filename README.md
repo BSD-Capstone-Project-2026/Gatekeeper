@@ -77,6 +77,7 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 | `/dashboard` (stats, chart, recent users) | ✅ | ✅ | Health only |
 | `/api/dashboard/stats`, `/api/dashboard/recent-users` | ✅ | ✅ | ❌ |
 | `/concierge`, `/api/recent-logs` (live door activity) | ✅ | ✅ | ❌ |
+| `/door-controls`, `/doors/<id>/lock`, `/doors/<id>/unlock` (POST) | ✅ | ✅ | ❌ |
 | `/users` | All users | Residents only | ❌ |
 | `/create-user` | Concierge, Resident | Resident | ❌ |
 | `/users/toggle/<id>`, `/unlock-user/<id>` (POST) | ✅ | ❌ | ❌ |

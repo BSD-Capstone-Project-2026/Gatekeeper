@@ -16,7 +16,9 @@ def add_missing_columns():
         existing = {c["name"] for c in inspector.get_columns(table.name)}
         for column in table.columns:
             if column.name not in existing:
-                db.session.execute(db.text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {column.type.compile(db.engine.dialect)}"))
+                default = column.default.arg if column.default is not None and column.default.is_scalar else None
+                suffix = "" if default is None else f" DEFAULT {int(default) if isinstance(default, bool) else repr(default)}"
+                db.session.execute(db.text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {column.type.compile(db.engine.dialect)}{suffix}"))
     db.session.commit()
 
 # Association table for users and zones (many-to-many)
@@ -139,6 +141,7 @@ class Door(db.Model):
     associated_unit = db.Column(db.String(10), nullable=True)
     zone_id = db.Column(db.Integer, db.ForeignKey('zones.id'), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
+    is_locked = db.Column(db.Boolean, default=True)
 
 
 class AccessLog(db.Model):

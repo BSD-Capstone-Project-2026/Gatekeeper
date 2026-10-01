@@ -1,33 +1,42 @@
-<div class="p-3">
-    <h4 class="text-center mb-4">🏢 {{ session.user_role|title }}</h4>
-    <hr>
-    <a href="{{ url_for('web.dashboard') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
-
-    {% if session.user_role in ['management', 'concierge'] %}
-    <a href="{{ url_for('web.concierge_dashboard') }}"><i class="bi bi-broadcast"></i> Live Activity</a>
-    <a href="{{ url_for('web.users_list') }}"><i class="bi bi-people"></i> Users</a>
-    <a href="{{ url_for('web.create_user') }}"><i class="bi bi-person-plus"></i> Create User</a>
-    <a href="{{ url_for('web.incident_list') }}">
-        <i class="bi bi-exclamation-triangle"></i> Incidents
-    </a>
+{% set role = session.user_role %}
+{% set staff = role in ['management', 'concierge'] %}
+{% set management = role == 'management' %}
+{% set sections = [
+    ('Overview', [
+        ('web.dashboard', 'speedometer2', 'Dashboard', True),
+        ('web.concierge_dashboard', 'broadcast', 'Live Activity', staff),
+        ('web.incident_list', 'bell', 'Incidents', staff),
+        ('web.door_controls', 'unlock', 'Door Controls', staff),
+        ('web.simulate', 'door-open', 'Access', role == 'resident'),
+        ('web.my_incidents', 'clock-history', 'Access History', not staff)
+    ]),
+    ('Manage', [
+        ('web.users_list', 'people', 'Users', staff),
+        ('web.create_user', 'person-plus', 'Create User', staff),
+        ('web.list_doors', 'door-closed', 'Doors', management),
+        ('web.list_zones', 'grid', 'Zones', management),
+        ('web.emergency_override', 'exclamation-octagon', 'Emergency Override', management)
+    ]),
+    ('Records', [
+        ('web.incidents', 'journal-text', 'Access Logs', management),
+        ('web.audit_logs', 'journal-check', 'Audit Log', management)
+    ]),
+    ('Account', [
+        ('web.profile', 'person-circle', 'Profile', True),
+        ('web.reset_password', 'key', 'Change Password', True)
+    ])
+] %}
+<nav class="app-nav" aria-label="Main navigation">
+    <a class="app-brand" href="{{ url_for('web.dashboard') }}"><i class="bi bi-shield-lock-fill"></i><span>Gatekeeper</span></a>
+    <div class="app-user">{{ session.user_name }} · {{ role|title }}</div>
+    {% for title, links in sections %}
+    {% set visible = links|selectattr('3')|list %}
+    {% if visible %}
+    <div class="app-nav-section">{{ title }}</div>
+    {% for endpoint, icon, label, _ in visible %}
+    <a class="app-nav-link{{ ' active' if request.endpoint == endpoint }}" href="{{ url_for(endpoint) }}"><i class="bi bi-{{ icon }}"></i>{{ label }}</a>
+    {% endfor %}
     {% endif %}
-
-    {% if session.user_role == 'management' %}
-    <a href="{{ url_for('web.emergency_override') }}">
-        <i class="bi bi-shield-exclamation"></i> Emergency Override
-    </a>
-    <a href="{{ url_for('web.list_zones') }}"><i class="bi bi-grid-3x3-gap-fill"></i> Zones</a>
-    <a href="{{ url_for('web.list_doors') }}"><i class="bi bi-door-open"></i> Doors</a>
-    <a href="{{ url_for('web.incidents') }}"><i class="bi bi-journal-text"></i> Access Logs</a>
-    <a href="{{ url_for('web.audit_logs') }}"><i class="bi bi-journal-check"></i> Audit Log</a>
-    {% endif %}
-
-    {% if session.user_role == 'resident' %}
-    <a href="{{ url_for('web.simulate') }}"><i class="bi bi-door-open"></i> Access Simulation</a>
-    {% endif %}
-
-    <a href="{{ url_for('web.profile') }}"><i class="bi bi-person-circle"></i> Profile</a>
-    <a href="{{ url_for('web.reset_password') }}"><i class="bi bi-key"></i> Reset Password</a>
-    <hr>
-    <a href="{{ url_for('web.logout') }}" class="text-warning"><i class="bi bi-box-arrow-left"></i> Logout</a>
-</div>
+    {% endfor %}
+    <a class="app-nav-link logout" href="{{ url_for('web.logout') }}"><i class="bi bi-box-arrow-right"></i>Sign Out</a>
+</nav>

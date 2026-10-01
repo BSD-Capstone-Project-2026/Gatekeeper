@@ -9,6 +9,7 @@ from routes.decorators import role_required
 from collections import defaultdict
 from datetime import datetime, timedelta
 import re
+import socket
 import time
 from datetime import datetime, timedelta
 from models import Incident, Notification
@@ -73,6 +74,20 @@ def enforce_session_timeout():
         return redirect(url_for('web.login', expired=1))
     if request.endpoint not in BACKGROUND_ENDPOINTS:
         session['last_activity'] = now
+
+def filter_by_dates(query, column, start_date, end_date):
+    errors = []
+    if start_date:
+        try:
+            query = query.filter(column >= datetime.strptime(start_date, '%Y-%m-%d'))
+        except ValueError:
+            errors.append("Invalid start date format. Use YYYY-MM-DD.")
+    if end_date:
+        try:
+            query = query.filter(column <= datetime.strptime(end_date + ' 23:59:59', '%Y-%m-%d %H:%M:%S'))
+        except ValueError:
+            errors.append("Invalid end date format. Use YYYY-MM-DD.")
+    return query, errors
 
 def account_status_error(user):
     if not user.is_active:
@@ -405,9 +420,13 @@ def incident_view(incident_id):
 @login_required
 @role_required('management', 'concierge')
 def incident_list():
-    incidents = Incident.query.order_by(Incident.created_at.desc()).all()
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    query, errors = filter_by_dates(Incident.query, Incident.created_at, start_date, end_date)
+    incidents = query.order_by(Incident.created_at.desc()).all()
     open_count = sum(1 for i in incidents if i.status == 'open')
-    return render_template("incident_list.html", incidents=incidents, open_count=open_count)
+    return render_template("incident_list.html", incidents=incidents, open_count=open_count,
+                           start_date=start_date, end_date=end_date, errors=errors)
 
 @web_bp.route("/incidents/<int:incident_id>/acknowledge", methods=["POST"])
 @login_required
@@ -521,6 +540,24 @@ def toggle_user(user_id):
 
 
 
+
+@web_bp.route("/door-controls")
+@login_required
+@role_required('management', 'concierge')
+def door_controls():
+    doors = Door.query.filter_by(is_active=True).order_by(Door.name).all()
+    return render_template("door_controls.html", doors=doors)
+
+@web_bp.route("/doors/<int:door_id>/<any(lock, unlock):action>", methods=["POST"])
+@login_required
+@role_required('management', 'concierge')
+def set_door_lock(door_id, action):
+    door = Door.query.get_or_404(door_id)
+    door.is_locked = action == 'lock'
+    db.session.add(AuditLog(user_id=session['user_id'], performed_by=session['user_id'], action=f"door_{action}",
+                            door_id=door.id, details=f"Door '{door.name}' {action}ed from the front desk"))
+    db.session.commit()
+    return redirect(url_for("web.door_controls"))
 
 @web_bp.route("/doors")
 @login_required
@@ -795,7 +832,20 @@ def health():
         print(f"Error type: {type(e).__name__}")
         print(f"Error message: {e}")
         print("="*50)
-    return jsonify({'server': 'healthy', 'database': db_status, 'network': 'healthy'})
+    network_status = check_network()
+    overall = 'down' if db_status == 'unhealthy' else 'degraded' if network_status == 'unhealthy' else 'healthy'
+    return jsonify({'status': overall, 'server': 'healthy', 'database': db_status, 'network': network_status})
+
+
+def check_network():
+    host = current_app.config.get("NETWORK_CHECK_HOST")
+    if not host:
+        return 'unknown'
+    try:
+        with socket.create_connection((host, current_app.config["NETWORK_CHECK_PORT"]), timeout=1):
+            return 'healthy'
+    except OSError:
+        return 'unhealthy'
 
 
 @web_bp.route("/unlock-user/<int:user_id>", methods=["POST"])
@@ -825,23 +875,9 @@ def incidents():
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     door_id = request.args.get('door_id', type=int)
-    errors = []
 
     query = db.session.query(AccessLog, User, Door).outerjoin(User, AccessLog.user_id == User.id).outerjoin(Door, AccessLog.door_id == Door.id)
-
-    if start_date:
-        try:
-            start = datetime.strptime(start_date, '%Y-%m-%d')
-            query = query.filter(AccessLog.timestamp >= start)
-        except ValueError:
-            errors.append("Invalid start date format. Use YYYY-MM-DD.")
-
-    if end_date:
-        try:
-            end = datetime.strptime(end_date + ' 23:59:59', '%Y-%m-%d %H:%M:%S')
-            query = query.filter(AccessLog.timestamp <= end)
-        except ValueError:
-            errors.append("Invalid end date format. Use YYYY-MM-DD.")
+    query, errors = filter_by_dates(query, AccessLog.timestamp, start_date, end_date)
 
     if door_id:
         query = query.filter(AccessLog.door_id == door_id)

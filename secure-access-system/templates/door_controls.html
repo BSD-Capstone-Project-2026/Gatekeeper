@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Door Controls - Gatekeeper{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-2 sidebar p-0">
+            {% include "_sidebar.html" %}
+        </div>
+        <div class="col-md-10 p-4">
+            <h2 class="mb-1">Door Controls</h2>
+            <p class="text-muted mb-4">Lock or unlock building doors from the front desk. Every action is recorded in the audit log.</p>
+
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr><th>Door</th><th>Location</th><th>Type</th><th>State</th><th class="text-end">Action</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for door in doors %}
+                            <tr>
+                                <td>{{ door.name }}</td>
+                                <td class="text-muted">{{ door.location or '—' }}</td>
+                                <td class="text-muted">{{ door.door_type|title }}</td>
+                                <td>
+                                    {% if door.is_locked == false %}
+                                    <span class="badge bg-warning"><i class="bi bi-unlock"></i> Unlocked</span>
+                                    {% else %}
+                                    <span class="badge bg-success"><i class="bi bi-lock"></i> Locked</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if door.is_locked == false %}
+                                    <form method="POST" action="{{ url_for('web.set_door_lock', door_id=door.id, action='lock') }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-primary">Lock</button>
+                                    </form>
+                                    {% else %}
+                                    <form method="POST" action="{{ url_for('web.set_door_lock', door_id=door.id, action='unlock') }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-secondary">Unlock</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="text-muted text-center">No active doors.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

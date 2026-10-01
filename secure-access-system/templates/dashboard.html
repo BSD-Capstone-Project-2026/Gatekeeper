@@ -199,27 +199,23 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Health check function
+const HEALTH_CLASSES = {healthy: 'badge bg-success', unknown: 'badge bg-warning', unhealthy: 'badge bg-danger'};
+const HEALTH_BADGES = {'server-status': ['server', 'Server'], 'db-status': ['database', 'Database'], 'network-status': ['network', 'Network']};
+
+function showHealth(data) {
+    Object.entries(HEALTH_BADGES).forEach(([id, [key, label]]) => {
+        const state = data[key] || 'unhealthy';
+        const badge = document.getElementById(id);
+        badge.className = HEALTH_CLASSES[state] + ' ms-2';
+        badge.textContent = `● ${label}${state === 'healthy' ? '' : ' ' + state}`;
+    });
+}
+
 function updateHealth() {
     fetch('/health')
         .then(res => res.json())
-        .then(data => {
-            document.getElementById('server-status').className = 'badge bg-success';
-            document.getElementById('server-status').innerHTML = '● Server';
-
-            document.getElementById('db-status').className = data.database === 'healthy' ? 'badge bg-success' : 'badge bg-danger';
-            document.getElementById('db-status').innerHTML = data.database === 'healthy' ? '● Database' : '✗ Database';
-
-            document.getElementById('network-status').className = 'badge bg-success';
-            document.getElementById('network-status').innerHTML = '● Network';
-        })
-        .catch(() => {
-            document.getElementById('server-status').className = 'badge bg-danger';
-            document.getElementById('server-status').innerHTML = '✗ Server';
-            document.getElementById('db-status').className = 'badge bg-danger';
-            document.getElementById('db-status').innerHTML = '✗ Database';
-            document.getElementById('network-status').className = 'badge bg-danger';
-            document.getElementById('network-status').innerHTML = '✗ Network';
-        });
+        .then(showHealth)
+        .catch(() => showHealth({}));
 }
 updateHealth();
 setInterval(updateHealth, 30000); // refresh every 30 seconds

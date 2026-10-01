@@ -7,36 +7,7 @@
 
         <!-- Sidebar -->
         <div class="col-md-2 sidebar p-0">
-            <div class="p-3">
-                <h4 class="text-center mb-4">🏢 Management</h4>
-                <hr>
-
-                <a href="{{ url_for('web.dashboard') }}">
-                    <i class="bi bi-speedometer2"></i> Dashboard
-                </a>
-
-                <a href="{{ url_for('web.users_list') }}">
-                    <i class="bi bi-people"></i> Users
-                </a>
-
-                <a href="{{ url_for('web.create_user') }}">
-                    <i class="bi bi-person-plus"></i> Create User
-                </a>
-
-                <a href="{{ url_for('web.incidents') }}" class="active">
-                    <i class="bi bi-exclamation-triangle"></i> Incidents
-                </a>
-
-                <a href="{{ url_for('web.profile') }}">
-                    <i class="bi bi-person-circle"></i> Profile
-                </a>
-
-                <hr>
-
-                <a href="{{ url_for('web.logout') }}" class="text-warning">
-                    <i class="bi bi-box-arrow-left"></i> Logout
-                </a>
-            </div>
+            {% include "_sidebar.html" %}
         </div>
 
         <!-- Main Content -->
