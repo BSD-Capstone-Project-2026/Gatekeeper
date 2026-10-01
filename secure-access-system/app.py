@@ -13,13 +13,14 @@ from routes.protected import protected_bp
 import secrets
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
-import subprocess
+from flask import current_app
+from scripts.backup import backup_database
 
 scheduler = BackgroundScheduler()
 
 
 def archive_old_logs():
-    cutoff = datetime.utcnow() - timedelta(days=90)   # adjust retention period
+    cutoff = datetime.utcnow() - timedelta(days=current_app.config["LOG_RETENTION_DAYS"])
     old_logs = AccessLog.query.filter(AccessLog.timestamp < cutoff).all()
 
     for log in old_logs:
@@ -39,10 +40,16 @@ def archive_old_logs():
 
     db.session.commit()
     print(f"Archived {len(old_logs)} old access logs.")
+    return len(old_logs)
 
 
 def backup_task():
-    subprocess.run(['python', 'scripts/backup.py'])
+    return backup_database(db.engine.url.database, current_app.config["BACKUP_DIR"], current_app.config["BACKUP_KEEP"])
+
+
+def run_in_context(app, job):
+    with app.app_context():
+        job()
 
 
 def create_app(config=Config):
@@ -219,8 +226,8 @@ def create_app(config=Config):
                 print("ℹ️ Test resident already in Ground zone")
 
         # ----- Scheduler Jobs -----
-        scheduler.add_job(func=archive_old_logs, trigger="interval", days=1)
-        scheduler.add_job(func=backup_task, trigger="interval", days=1)
+        scheduler.add_job(func=run_in_context, args=[app, archive_old_logs], trigger="interval", days=1)
+        scheduler.add_job(func=run_in_context, args=[app, backup_task], trigger="interval", days=1)
 
         if not scheduler.running:
             scheduler.start()

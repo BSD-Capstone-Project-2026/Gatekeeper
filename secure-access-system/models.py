@@ -110,6 +110,7 @@ class Notification(db.Model):
     status = db.Column(db.String(20), default='queued')  # queued, sent, failed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     sent_at = db.Column(db.DateTime, nullable=True)
+    is_read = db.Column(db.Boolean, default=False)
 
     user = db.relationship('User', backref='notifications')
 
@@ -165,6 +166,7 @@ class AuditLog(db.Model):
 class AccessLogArchive(db.Model):
     __tablename__ = 'access_logs_archive'
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     door_id = db.Column(db.Integer, db.ForeignKey('doors.id'), nullable=True)
     unit_door = db.relationship('Door', foreign_keys=[door_id], uselist=False)
     timestamp = db.Column(db.DateTime)

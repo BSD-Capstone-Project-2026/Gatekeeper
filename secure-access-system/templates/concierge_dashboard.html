@@ -10,7 +10,7 @@
         <div class="col-md-10 p-4">
             <h2><i class="bi bi-door-open"></i> Real-Time Door Activity</h2>
             <div class="alert alert-info">
-                <i class="bi bi-info-circle"></i> Auto-refreshes every 5 seconds. Shows access attempts for main and common areas.
+                <i class="bi bi-info-circle"></i> Updates every 5 seconds. Showing the latest 50 access attempts.
             </div>
 
             <div class="table-responsive">
@@ -25,49 +25,46 @@
                         </tr>
                     </thead>
                     <tbody id="log-tbody">
-                        <td><td colspan="5" class="text-center">Loading...</td></tr>
+                        <tr><td colspan="5" class="text-center">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    let lastTimestamp = null;
+    const MAX_ROWS = 50;
+    let cursor = null;
 
-    function fetchLogs() {
-        let url = '/api/recent-logs';
-        if (lastTimestamp) {
-            url += '?since=' + encodeURIComponent(lastTimestamp);
-        }
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                if (data.now) {
-                    lastTimestamp = data.now;
-                }
-                updateTable(data.logs);
-            })
-            .catch(err => console.error('Error fetching logs:', err));
+    function addRow(tbody, log, atTop) {
+        const row = tbody.insertRow(atTop ? 0 : -1);
+        row.className = log.success ? '' : 'table-danger';
+        row.insertCell(0).innerText = new Date(log.timestamp).toLocaleTimeString();
+        row.insertCell(1).innerText = log.user_name;
+        row.insertCell(2).innerText = log.door_name;
+        row.insertCell(3).innerHTML = log.success ? '<span class="badge bg-success">Success</span>' : '<span class="badge bg-danger">Denied</span>';
+        row.insertCell(4).innerText = log.failure_reason;
     }
 
-    function updateTable(logs) {
-        const tbody = document.getElementById('log-tbody');
-        if (!logs.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No recent activity</td></tr>';
-            return;
-        }
-        tbody.innerHTML = '';
-        logs.forEach(log => {
-            const row = tbody.insertRow();
-            row.className = log.success ? '' : 'table-danger';
-            row.insertCell(0).innerText = new Date(log.timestamp).toLocaleTimeString();
-            row.insertCell(1).innerText = log.user_name;
-            row.insertCell(2).innerText = log.door_name;
-            row.insertCell(3).innerHTML = log.success ? '<span class="badge bg-success">✅ Success</span>' : '<span class="badge bg-danger">❌ Denied</span>';
-            row.insertCell(4).innerText = log.failure_reason;
-        });
+    function fetchLogs() {
+        fetch('/api/recent-logs' + (cursor ? '?since=' + encodeURIComponent(cursor) : ''))
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.getElementById('log-tbody');
+                if (cursor === null) {
+                    tbody.innerHTML = data.logs.length ? '' : '<tr id="empty-row"><td colspan="5" class="text-center">No recent activity</td></tr>';
+                    data.logs.forEach(log => addRow(tbody, log, false));
+                } else if (data.logs.length) {
+                    document.getElementById('empty-row')?.remove();
+                    data.logs.slice().reverse().forEach(log => addRow(tbody, log, true));
+                    while (tbody.rows.length > MAX_ROWS) tbody.deleteRow(-1);
+                }
+                cursor = data.cursor;
+            })
+            .catch(err => console.error('Error fetching logs:', err));
     }
 
     fetchLogs();

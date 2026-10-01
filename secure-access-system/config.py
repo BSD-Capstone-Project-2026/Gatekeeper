@@ -26,6 +26,17 @@ class Config:
     DEMO_USER_EMAIL = "demo@building.local"
     DEMO_USER_PASSWORD = os.environ.get("DEMO_USER_PASSWORD", "DemoPass123")
 
+    BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups")
+    BACKUP_KEEP = 10
+    LOG_RETENTION_DAYS = 90
+
+    MAIL_SERVER = os.environ.get("MAIL_SERVER")
+    MAIL_PORT = int(os.environ.get("MAIL_PORT", 587))
+    MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
+    MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
+    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
+    MAIL_SENDER = os.environ.get("MAIL_SENDER", "gatekeeper@building.local")
+
     INCIDENT_FAILURE_THRESHOLD = 3
     INCIDENT_WINDOW_MINUTES = 10
 

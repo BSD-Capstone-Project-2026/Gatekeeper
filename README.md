@@ -76,6 +76,7 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 |-------|:---:|:---:|:---:|
 | `/dashboard` (stats, chart, recent users) | ✅ | ✅ | Health only |
 | `/api/dashboard/stats`, `/api/dashboard/recent-users` | ✅ | ✅ | ❌ |
+| `/concierge`, `/api/recent-logs` (live door activity) | ✅ | ✅ | ❌ |
 | `/users` | All users | Residents only | ❌ |
 | `/create-user` | Concierge, Resident | Resident | ❌ |
 | `/users/toggle/<id>`, `/unlock-user/<id>` (POST) | ✅ | ❌ | ❌ |
@@ -112,6 +113,16 @@ python app.py
 ```
 
 Then open `http://localhost:5000` in your browser. The database is created and seeded in `instance/` on first run.
+
+### Backup and Restore
+
+The app backs up the database daily to `secure-access-system/backups/` (newest 10 kept) and archives access logs older than 90 days.
+
+```bash
+python scripts/backup.py                                # manual backup
+python scripts/restore.py                               # list available backups
+python scripts/restore.py backups/secure_access_<timestamp>.db   # restore (stop the app first)
+```
 
 ---
 

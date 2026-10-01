@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 import re
 import time
 from datetime import datetime, timedelta
-from models import Incident
+from models import Incident, Notification
+from utils.notifications import notify, send_email
 
 # Blueprint for access API (door/elevator)
 access_bp = Blueprint('access', __name__, url_prefix='/api/access')
@@ -56,6 +57,13 @@ def login_required(f):
             return redirect(url_for('web.login'))
         return f(*args, **kwargs)
     return decorated_function
+
+def account_status_error(user):
+    if not user.is_active:
+        return "account inactive"
+    if user.is_locked:
+        return "account locked"
+    return None
 
 # Helper functions for password and username generation
 def generate_password(length=10):
@@ -119,8 +127,39 @@ def login():
     session['user_name'] = f"{user.first_name} {user.last_name}"
     session['user_email'] = user.email
     session['jwt_token'] = access_token
-    
-    return redirect(url_for("web.dashboard"))
+
+    return redirect(url_for("web.concierge_dashboard" if user.role == 'concierge' else "web.dashboard"))
+
+
+@web_bp.route("/concierge")
+@login_required
+@role_required('management', 'concierge')
+def concierge_dashboard():
+    return render_template("concierge_dashboard.html")
+
+
+@web_bp.route("/api/recent-logs")
+@login_required
+@role_required('management', 'concierge')
+def recent_logs():
+    query = db.session.query(AccessLog, User, Door).outerjoin(User, AccessLog.user_id == User.id).outerjoin(Door, AccessLog.door_id == Door.id)
+    since = request.args.get('since')
+    if since:
+        try:
+            query = query.filter(AccessLog.timestamp > datetime.fromisoformat(since.rstrip('Z')))
+        except ValueError:
+            return jsonify({"error": "Invalid 'since' timestamp"}), 400
+    rows = query.order_by(AccessLog.timestamp.desc()).limit(50).all()
+    return jsonify({
+        "cursor": rows[0][0].timestamp.isoformat() + "Z" if rows else since or datetime.utcnow().isoformat() + "Z",
+        "logs": [{
+            "timestamp": log.timestamp.isoformat() + "Z",
+            "user_name": f"{user.first_name} {user.last_name}" if user else "Unknown",
+            "door_name": door.name if door else "Unknown",
+            "success": bool(log.success),
+            "failure_reason": log.failure_reason or ""
+        } for log, user, door in rows]
+    })
 
 @web_bp.route("/dashboard")
 @login_required
@@ -151,8 +190,6 @@ def dashboard():
 @jwt_required()
 def request_access():
     data = request.get_json()
-    print("🔑 /request called with data:", data)
-
     if not data:
         return jsonify({"error": "No data provided"}), 400
 
@@ -160,21 +197,22 @@ def request_access():
     wifi_ssid = data.get('wifi_ssid')
     proximity = data.get('proximity', False)
 
-    print(f"door_id={door_id}, wifi={wifi_ssid}, proximity={proximity}")
-
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
-    print(f"user: {user.username}, role={user.role}, unit={user.unit_number}")
 
     if not user:
         return jsonify({"error": "User not found"}), 404
 
     door = Door.query.get(door_id)
     if not door:
-        print(f"❌ Door {door_id} not found in DB")
         return jsonify({"error": "Door not found"}), 404
 
-    print(f"door: {door.name}, type={door.door_type}, assoc_unit={door.associated_unit}")
+    status_error = account_status_error(user)
+    if status_error:
+        db.session.add(AccessLog(user_id=user.id, door_id=door.id, success=False, failure_reason=status_error,
+                                 ip_address=request.remote_addr, user_agent=request.headers.get('User-Agent')))
+        db.session.commit()
+        return jsonify({"error": "Access denied", "access_granted": False}), 403
 
     # Rate limiting check (before processing)
     allowed, message = rate_limiter.is_allowed(user.id, door.id)
@@ -192,13 +230,10 @@ def request_access():
     permission = False
     if door.door_type == 'main' and user.role in ['resident', 'concierge', 'management']:
         permission = True
-        print("✅ main door allowed")
     elif door.door_type == 'unit' and door.associated_unit == user.unit_number:
         permission = True
-        print("✅ unit door allowed (unit matches)")
     elif door.door_type == 'common' and user.role in ['concierge', 'management']:
         permission = True
-        print("✅ common door allowed")
 
     # Zone check
     zone_ok = True
@@ -206,11 +241,9 @@ def request_access():
         user_zone_ids = [z.id for z in user.zones]
         if door.zone_id not in user_zone_ids:
             zone_ok = False
-            print("❌ zone not allowed")
 
     # Final decision
     success = permission and wifi_ok and proximity_ok and zone_ok
-    print(f"permission={permission}, wifi_ok={wifi_ok}, proximity_ok={proximity_ok}, zone_ok={zone_ok} => success={success}")
 
     reasons = []
     if not success:
@@ -287,23 +320,15 @@ def request_access():
                     db.session.add(incident)
                     db.session.commit()
 
-                    # Notify resident (requires Notification model)
                     resident = User.query.filter_by(
                         unit_number=unit,
                         role='resident'
                     ).first()
 
                     if resident:
-                        # TODO: Create Notification model and uncomment
-                        # notification = Notification(
-                        #     user_id=resident.id,
-                        #     incident_id=incident.id,
-                        #     message=f"Security alert: {recent_failures} failed attempts on your unit door ({door.name}) within 10 minutes.",
-                        #     status='queued'
-                        # )
-                        # db.session.add(notification)
-                        # db.session.commit()
-                        print(f"📩 Notification would be queued for {resident.email}")
+                        notify(resident, "Security alert: repeated failed attempts on your unit",
+                               f"Security alert ({incident.incident_type}): {incident.attempt_count} failed attempts on "
+                               f"{door.name} (unit {unit}) at {incident.last_attempt_time:%Y-%m-%d %H:%M} UTC.", incident.id)
 
     # Final response
     if success:
@@ -622,7 +647,9 @@ def forgot_password():
         user.reset_token = secrets.token_urlsafe(32)
         user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
         db.session.commit()
-        current_app.logger.info("Password reset link for %s: %s", user.email, url_for("web.reset_password_with_token", token=user.reset_token, _external=True))
+        link = url_for("web.reset_password_with_token", token=user.reset_token, _external=True)
+        if send_email(user.email, "Gatekeeper password reset", f"Reset your password within 1 hour: {link}") is None:
+            current_app.logger.info("Password reset link for %s: %s", user.email, link)
 
     return render_template("forgot_password.html", success="If an account exists for that email, a reset link has been sent.")
 
@@ -681,9 +708,12 @@ def simulate():
 @access_bp.route('/elevator/call', methods=['POST'])
 @jwt_required()
 def call_elevator():
-    user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-    if not user or user.role != 'resident':
+    user = User.query.get(get_jwt_identity())
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if account_status_error(user):
+        return jsonify({"error": "Access denied"}), 403
+    if user.role != 'resident':
         return jsonify({"error": "Only residents can use elevator"}), 403
     return jsonify({"message": "Elevator summoned", "floor": user.floor}), 200
 
@@ -697,7 +727,12 @@ def profile():
     if not user:
         session.clear()
         return redirect(url_for('web.login'))
-    return render_template("profile.html", user=user)
+    notifications = Notification.query.filter_by(user_id=user.id).order_by(Notification.created_at.desc()).all()
+    unread = sum(1 for n in notifications if not n.is_read)
+    page = render_template("profile.html", user=user, notifications=notifications, unread=unread)
+    Notification.query.filter_by(user_id=user.id, is_read=False).update({"is_read": True})
+    db.session.commit()
+    return page
 
 @web_bp.route("/reset-password", methods=["GET", "POST"])
 @login_required

@@ -4,6 +4,7 @@
     <a href="{{ url_for('web.dashboard') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
 
     {% if session.user_role in ['management', 'concierge'] %}
+    <a href="{{ url_for('web.concierge_dashboard') }}"><i class="bi bi-broadcast"></i> Live Activity</a>
     <a href="{{ url_for('web.users_list') }}"><i class="bi bi-people"></i> Users</a>
     <a href="{{ url_for('web.create_user') }}"><i class="bi bi-person-plus"></i> Create User</a>
     <a href="{{ url_for('web.incident_list') }}">
