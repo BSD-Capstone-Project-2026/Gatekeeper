@@ -1,4 +1,4 @@
-from models import User, Door, Zone, AccessLog, Incident, Notification
+from models import User, Door, Zone, AccessLog, Incident, Notification, EntryRequest, ParkingPermit, VisitorPass, WatchlistEntry
 from scripts.seed_demo import seed_demo, DOMAIN
 from utils.log_integrity import verify_log_chain
 
@@ -36,3 +36,12 @@ def test_demo_accounts_can_sign_in(app, client):
     seed_demo("Demo@2026")
     res = client.post("/login", data={"email": f"priya.sharma@{DOMAIN}", "password": "Demo@2026"})
     assert res.location.endswith("/dashboard")
+
+
+def test_seed_adds_visitor_examples_once(app):
+    seed_demo("Demo@2026")
+    counts = [t.query.count() for t in (VisitorPass, EntryRequest, ParkingPermit, WatchlistEntry)]
+    assert all(counts)
+    seed_demo("Demo@2026")
+    assert [t.query.count() for t in (VisitorPass, EntryRequest, ParkingPermit, WatchlistEntry)] == counts
+    assert {p.status for p in VisitorPass.query} == {"Checked in", "Scheduled", "Active", "Expired", "Revoked"}

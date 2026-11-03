@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models import db, User, Door, Zone, AccessLog, Incident, Notification, AuditLog
+from models import db, User, Door, Zone, AccessLog, Incident, Notification, AuditLog, EntryRequest, ParkingPermit, VisitorPass, WatchlistEntry
 
 DOMAIN = "gatekeeper.demo"
 STAFF = [("management", "Maya", "Chen"), ("management", "Daniel", "Okafor"),
@@ -71,6 +71,46 @@ def seed_history(residents, unit_doors, main_door, gym_door, guest, concierge):
                             details="Door 'Gym Door' locked from the front desk", timestamp=now - timedelta(hours=2, minutes=45)))
 
 
+def seed_visitors(staff, residents):
+    maya, daniel, priya, lucas = staff
+    aisha, ben, chloe, diego, emma, farhan, grace, hiro, isabel, jamal = residents
+    now = datetime.utcnow()
+
+    if not VisitorPass.query.filter_by(code="SAMLEE29").first():
+        db.session.add_all([
+            VisitorPass(code="SAMLEE29", resident_id=aisha.id, visitor_name="Sam Lee", valid_from=now - timedelta(hours=1),
+                        valid_until=now + timedelta(hours=5), checked_in_at=now - timedelta(minutes=30), checked_in_by=priya.id),
+            VisitorPass(code="JBLAKE29", resident_id=aisha.id, visitor_name="Jordan Blake", valid_from=now + timedelta(days=1),
+                        valid_until=now + timedelta(days=1, hours=4)),
+            VisitorPass(code="NPATEL29", resident_id=ben.id, visitor_name="Nora Patel", valid_from=now - timedelta(minutes=30), valid_until=now + timedelta(hours=6)),
+            VisitorPass(code="MHLLEXP2", resident_id=chloe.id, visitor_name="Mark Hill", valid_from=now - timedelta(days=2), valid_until=now - timedelta(days=1)),
+            VisitorPass(code="LFRDREV2", resident_id=diego.id, visitor_name="Lena Ford", valid_from=now - timedelta(hours=1),
+                        valid_until=now + timedelta(hours=3), revoked_at=now - timedelta(minutes=20))])
+
+    if not EntryRequest.query.filter_by(visitor_name="Casey Wu").first():
+        for name, unit, status, decider, ago in [("Casey Wu", "2A", "approved", aisha, 2), ("Tom Reed", "3A", "denied", chloe, 5), ("Ivy Chen", "5B", "pending", None, 26)]:
+            created = now - timedelta(hours=ago)
+            db.session.add(EntryRequest(token=secrets.token_urlsafe(16), visitor_name=name, unit_number=unit, status=status, created_at=created,
+                                        expires_at=created + timedelta(minutes=2), decided_at=created + timedelta(minutes=1) if decider else None,
+                                        decided_by=decider.id if decider else None))
+
+    if not ParkingPermit.query.filter_by(code="PKBENC24").first():
+        for resident, code, plate, visitor, hours, status, start, decider in [
+                (ben, "PKBENC24", "CXRT 482", "Sam Lee", 4, "approved", now - timedelta(hours=1), priya),
+                (aisha, "PKAYSH24", "BKLM 907", "Nora Patel", 24, "pending", now - timedelta(minutes=10), None),
+                (emma, "PKEMMA24", "LMNP 351", "Ravi Shah", 2, "declined", now - timedelta(hours=3), lucas),
+                (grace, "PKGRCE24", "QWRT 778", "Tara Moss", 2, "approved", now - timedelta(days=1), priya)]:
+            db.session.add(ParkingPermit(resident_id=resident.id, code=code, plate=plate, plate_key=plate.replace(" ", ""), visitor_name=visitor,
+                                         hours=hours, status=status, starts_at=start, ends_at=start + timedelta(hours=hours),
+                                         decided_at=start if decider else None, decided_by=decider.id if decider else None))
+
+    if not WatchlistEntry.query.filter_by(name_key="alex stone").first():
+        db.session.add(WatchlistEntry(name="Alex Stone", name_key="alex stone", reason="Threatened front desk staff", added_by=maya.id,
+                                      created_at=now - timedelta(days=3)))
+        db.session.add(AuditLog(user_id=maya.id, performed_by=maya.id, action="watchlist_added", details="Alex Stone",
+                                reason="Threatened front desk staff", timestamp=now - timedelta(days=3)))
+
+
 def seed_demo(password):
     zones = {name: get_or_create(Zone, {"name": name}, description=desc) for name, desc in ZONES.items()}
     main_door = get_or_create(Door, {"name": "Main Entrance"}, location="Lobby", door_type="main", is_active=True)
@@ -91,6 +131,7 @@ def seed_demo(password):
     cleaner = demo_user("cleaner", "Rosa", "Diaz", password)
     cleaner.zones = list(zones.values())
     guest.zones = [zones["Ground"]]
+    seed_visitors(staff, residents)
 
     created = [u for u in staff + residents + [guest, cleaner] if not AuditLog.query.filter_by(user_id=u.id, action="create").first()]
     for user in created:
