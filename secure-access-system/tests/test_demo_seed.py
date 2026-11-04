@@ -1,4 +1,4 @@
-from models import User, Door, Zone, AccessLog, Incident, Notification, EntryRequest, ParkingPermit, VisitorPass, WatchlistEntry
+from models import User, Door, Zone, AccessLog, Incident, Notification, EntryRequest, KeyLoan, LostItem, Package, ParkingPermit, ShiftLogEntry, VisitorPass, WatchlistEntry
 from scripts.seed_demo import seed_demo, DOMAIN
 from utils.log_integrity import verify_log_chain
 
@@ -45,3 +45,12 @@ def test_seed_adds_visitor_examples_once(app):
     seed_demo("Demo@2026")
     assert [t.query.count() for t in (VisitorPass, EntryRequest, ParkingPermit, WatchlistEntry)] == counts
     assert {p.status for p in VisitorPass.query} == {"Checked in", "Scheduled", "Active", "Expired", "Revoked"}
+
+
+def test_seed_adds_front_desk_examples_once(app):
+    seed_demo("Demo@2026")
+    counts = [t.query.count() for t in (Package, ShiftLogEntry, KeyLoan, LostItem)]
+    assert counts == [4, 3, 3, 3]
+    seed_demo("Demo@2026")
+    assert [t.query.count() for t in (Package, ShiftLogEntry, KeyLoan, LostItem)] == counts
+    assert KeyLoan.query.filter_by(returned_at=None).count() == 2

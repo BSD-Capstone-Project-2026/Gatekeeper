@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models import db, User, Door, Zone, AccessLog, Incident, Notification, AuditLog, BuildingKey, EntryRequest, ParkingPermit, VisitorPass, WatchlistEntry
+from models import db, User, Door, Zone, AccessLog, Incident, Notification, AuditLog, BuildingKey, EntryRequest, KeyLoan, LostItem, Package, ParkingPermit, ShiftLogEntry, VisitorPass, WatchlistEntry
 
 DOMAIN = "gatekeeper.demo"
 STAFF = [("management", "Maya", "Chen"), ("management", "Daniel", "Okafor"),
@@ -111,6 +111,39 @@ def seed_visitors(staff, residents):
         db.session.add(AuditLog(user_id=maya.id, performed_by=maya.id, action="watchlist_added", details="Alex Stone",
                                 reason="Threatened front desk staff", timestamp=now - timedelta(days=3)))
 
+def seed_front_desk(staff, keys):
+    maya, daniel, priya, lucas = staff
+    now = datetime.utcnow()
+
+    if not Package.query.filter_by(description="Padded envelope").first():
+        for unit, carrier, description, ago, released in [("2A", "Amazon", "Small box", 2, None), ("2A", "Canada Post", "Padded envelope", 1, None),
+                                                          ("3B", "UPS", "Large box, heavy", 5, lucas), ("4A", "FedEx", "Documents", 3, None)]:
+            db.session.add(Package(unit_number=unit, carrier=carrier, description=description, logged_by=priya.id, logged_at=now - timedelta(hours=ago),
+                                   picked_up_at=now - timedelta(hours=1) if released else None, released_by=released.id if released else None))
+
+    if not ShiftLogEntry.query.filter(ShiftLogEntry.body.like("Courier tried%")).first():
+        db.session.add_all([
+            ShiftLogEntry(author_id=lucas.id, category="Security", body="Courier tried to enter through the garage; sent to the front door.", created_at=now - timedelta(hours=26)),
+            ShiftLogEntry(author_id=priya.id, category="Note", body="Lobby lights flickering near the mailboxes.", created_at=now - timedelta(hours=5)),
+            ShiftLogEntry(author_id=priya.id, category="Maintenance", unit_number="4B", body="Plumber for 4B at 9 am, let them into the unit.",
+                          is_handover=True, created_at=now - timedelta(hours=4))])
+
+    if not KeyLoan.query.filter_by(contractor="Sam Ortiz").first():
+        for key, contractor, company, purpose, out, due, returned in [
+                ("Boiler Room", "Mike Ross", "CoolAir HVAC", "Boiler service", 1, -2, None),
+                ("Roof Access", "Dana Lee", "Skyline Roofing", "Roof inspection", 3, 0.5, None),
+                ("Electrical Room", "Sam Ortiz", "Volt Electric", "Panel check", 26, 24, lucas)]:
+            db.session.add(KeyLoan(key_id=keys[key].id, contractor=contractor, company=company, purpose=purpose, signed_out_by=priya.id,
+                                   signed_out_at=now - timedelta(hours=out), expected_return=now - timedelta(hours=due),
+                                   returned_at=now - timedelta(hours=24) if returned else None, received_by=returned.id if returned else None))
+
+    if not LostItem.query.filter_by(description="Blue water bottle").first():
+        db.session.add_all([
+            LostItem(description="Black umbrella", found_location="Lobby", notes="Found by the mailboxes", logged_by=priya.id, found_at=now - timedelta(hours=6)),
+            LostItem(description="AirPods case", found_location="Gym", notes="Kept in the desk drawer", logged_by=lucas.id, found_at=now - timedelta(days=1)),
+            LostItem(description="Blue water bottle", found_location="Rooftop", logged_by=priya.id, found_at=now - timedelta(days=2),
+                     returned_at=now - timedelta(days=1), claimant_name="Ben Carter", returned_by=lucas.id)])
+
 
 def seed_demo(password):
     zones = {name: get_or_create(Zone, {"name": name}, description=desc) for name, desc in ZONES.items()}
@@ -132,9 +165,9 @@ def seed_demo(password):
     cleaner = demo_user("cleaner", "Rosa", "Diaz", password)
     cleaner.zones = list(zones.values())
     guest.zones = [zones["Ground"]]
-    for name, location in BUILDING_KEYS:
-        get_or_create(BuildingKey, {"name": name}, location=location)
+    keys = {name: get_or_create(BuildingKey, {"name": name}, location=location) for name, location in BUILDING_KEYS}
     seed_visitors(staff, residents)
+    seed_front_desk(staff, keys)
 
     created = [u for u in staff + residents + [guest, cleaner] if not AuditLog.query.filter_by(user_id=u.id, action="create").first()]
     for user in created:
