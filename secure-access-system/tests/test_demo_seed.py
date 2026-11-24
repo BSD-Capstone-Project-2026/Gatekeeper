@@ -1,4 +1,4 @@
-from models import User, Door, Zone, AccessLog, Incident, Notification, EntryRequest, KeyLoan, LostItem, Package, ParkingPermit, ShiftLogEntry, VisitorPass, WatchlistEntry
+from models import AmenityBooking, Announcement, MaintenanceRequest, MoveRequest, User, Door, Zone, AccessLog, Incident, Notification, EntryRequest, KeyLoan, LostItem, Package, ParkingPermit, ShiftLogEntry, VisitorPass, WatchlistEntry
 from scripts.seed_demo import seed_demo, DOMAIN
 from utils.log_integrity import verify_log_chain
 
@@ -54,3 +54,11 @@ def test_seed_adds_front_desk_examples_once(app):
     seed_demo("Demo@2026")
     assert [t.query.count() for t in (Package, ShiftLogEntry, KeyLoan, LostItem)] == counts
     assert KeyLoan.query.filter_by(returned_at=None).count() == 2
+
+
+def test_seed_adds_services_examples_once(app):
+    seed_demo("Demo@2026")
+    counts = [t.query.count() for t in (Announcement, MaintenanceRequest, AmenityBooking, MoveRequest)]
+    assert counts == [2, 3, 3, 4]
+    seed_demo("Demo@2026")
+    assert [t.query.count() for t in (Announcement, MaintenanceRequest, AmenityBooking, MoveRequest)] == counts

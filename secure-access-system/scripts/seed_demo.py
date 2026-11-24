@@ -5,7 +5,9 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models import db, User, Door, Zone, AccessLog, Incident, Notification, AuditLog, BuildingKey, Amenity, EntryRequest, KeyLoan, LostItem, Package, ParkingPermit, ShiftLogEntry, VisitorPass, WatchlistEntry
+from models import (db, User, Door, Zone, AccessLog, Incident, Notification, AuditLog, BuildingKey, Amenity, AmenityBooking, Announcement,
+                    EntryRequest, KeyLoan, LostItem, MaintenanceRequest, MoveRequest, Package, ParkingPermit, ShiftLogEntry, VisitorPass,
+                    WatchlistEntry)
 
 DOMAIN = "gatekeeper.demo"
 STAFF = [("management", "Maya", "Chen"), ("management", "Daniel", "Okafor"),
@@ -145,6 +147,40 @@ def seed_front_desk(staff, keys):
             LostItem(description="Blue water bottle", found_location="Rooftop", logged_by=priya.id, found_at=now - timedelta(days=2),
                      returned_at=now - timedelta(days=1), claimant_name="Ben Carter", returned_by=lucas.id)])
 
+def seed_services(staff, residents, amenities):
+    maya, daniel, priya, lucas = staff
+    aisha, ben, chloe, diego, emma, farhan, grace, hiro, isabel, jamal = residents
+    now = datetime.utcnow()
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    if not Announcement.query.filter_by(title="Fire drill Tuesday 10 am").first():
+        db.session.add_all([
+            Announcement(title="Fire drill Tuesday 10 am", body="The alarm will sound for about five minutes. Please use the stairs.",
+                         floors="", expires_at=now + timedelta(days=5), created_by=maya.id, created_at=now - timedelta(hours=8)),
+            Announcement(title="Water off Friday 10-12", body="Plumbers are replacing a riser valve on floor 2. Water will be off from 10 am to noon.",
+                         floors="2", expires_at=now + timedelta(days=4), created_by=maya.id, created_at=now - timedelta(hours=3))])
+
+    if not MaintenanceRequest.query.filter_by(description="Bedroom radiator stays cold.").first():
+        db.session.add_all([
+            MaintenanceRequest(resident_id=aisha.id, unit_number="2A", category="Plumbing", description="Kitchen tap is leaking under the sink.",
+                               entry_allowed=True, status="In Progress", created_at=now - timedelta(days=1), updated_at=now - timedelta(hours=6), updated_by=maya.id),
+            MaintenanceRequest(resident_id=ben.id, unit_number="2B", category="Electrical", description="Bathroom light flickers.", created_at=now - timedelta(hours=10)),
+            MaintenanceRequest(resident_id=isabel.id, unit_number="6A", category="Heating and cooling", description="Bedroom radiator stays cold.",
+                               entry_allowed=True, status="Completed", created_at=now - timedelta(days=4), updated_at=now - timedelta(days=2), updated_by=daniel.id)])
+
+    if not AmenityBooking.query.filter_by(user_id=isabel.id, amenity_id=amenities["Rooftop"].id).first():
+        for resident, amenity, day, hour in [(aisha, "Gym", 1, 18), (ben, "Party Room", 1, 20), (isabel, "Rooftop", 2, 10)]:
+            db.session.add(AmenityBooking(amenity_id=amenities[amenity].id, user_id=resident.id, starts_at=today + timedelta(days=day, hours=hour)))
+
+    if not MoveRequest.query.filter(MoveRequest.reason.like("Service elevator already booked%")).first():
+        for resident, kind, day, slot, status, reason in [
+                (ben, "Move-in", 5, "Morning", "Pending", None), (farhan, "Move-out", 3, "Afternoon", "Approved", None),
+                (jamal, "Move-in", 0, "Evening", "Approved", None),
+                (hiro, "Move-out", 3, "Afternoon", "Rejected", "Service elevator already booked for unit 4B that afternoon")]:
+            db.session.add(MoveRequest(resident_id=resident.id, unit_number=resident.unit_number, kind=kind, move_date=(today + timedelta(days=day)).date(),
+                                       slot=slot, status=status, reason=reason, decided_at=None if status == "Pending" else now - timedelta(hours=2),
+                                       decided_by=None if status == "Pending" else maya.id))
+
 
 def seed_demo(password):
     zones = {name: get_or_create(Zone, {"name": name}, description=desc) for name, desc in ZONES.items()}
@@ -171,6 +207,7 @@ def seed_demo(password):
                  for name, door, opens, closes, capacity in AMENITIES}
     seed_visitors(staff, residents)
     seed_front_desk(staff, keys)
+    seed_services(staff, residents, amenities)
 
     created = [u for u in staff + residents + [guest, cleaner] if not AuditLog.query.filter_by(user_id=u.id, action="create").first()]
     for user in created:
