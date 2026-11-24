@@ -3,7 +3,21 @@
 {% block heading %}Hi, {{ user.first_name }}{% endblock %}
 {% block description %}{% if user.unit_number %}Unit {{ user.unit_number }} · Floor {{ user.floor }}{% else %}{{ user.role|title }} access{% endif %}{% if user.access_expires_at %} · Valid until {{ user.access_expires_at.strftime('%b %d, %Y') }}{% endif %}{% endblock %}
 
+{% block head %}<link href="{{ url_for('static', filename='css/services.css') }}" rel="stylesheet">{% endblock %}
+
 {% block body %}
+{% for n in notices %}
+<a class="card notice-card is-unread mb-3" href="{{ url_for('services.open_announcement', announcement_id=n.id) }}">
+    <div class="card-body">
+        <span class="notice-icon"><i class="bi bi-megaphone-fill"></i></span>
+        <div class="flex-grow-1 min-w-0">
+            <div class="d-flex align-items-center gap-2"><span class="unread-dot" aria-label="Unread"></span><span class="fw-semibold">{{ n.title }}</span></div>
+            <div class="notice-preview">{{ n.body }}</div>
+        </div>
+        <i class="bi bi-chevron-right text-muted"></i>
+    </div>
+</a>
+{% endfor %}
 <div class="row g-3">
     <div class="col-lg-7">
         <div class="card home-hero h-100">

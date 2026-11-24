@@ -1,0 +1,33 @@
+{% extends "app_base.html" %}
+
+{% block head %}
+<link href="{{ url_for('static', filename='css/visitors.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/desk.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/services.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block heading %}Services{% endblock %}
+
+{% block body %}
+{% set services_tabs = [
+    ('services.announcements', 'megaphone', 'Announcements', ['services.announcements', 'services.publish_announcement', 'services.open_announcement'])
+] %}
+{% if services_tabs|length > 1 %}
+<nav class="segmented mb-4" aria-label="Services sections">
+    {% for endpoint, icon, label, matches in services_tabs %}
+    <a class="segmented-item{{ ' active' if request.endpoint in matches }}" href="{{ url_for(endpoint) }}"><i class="bi bi-{{ icon }}"></i>{{ label }}</a>
+    {% endfor %}
+</nav>
+{% endif %}
+{% block tab %}{% endblock %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.querySelectorAll('time[data-local]').forEach(el => {
+        const date = new Date(el.getAttribute('datetime'));
+        el.textContent = date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    });
+</script>
+{% block tab_scripts %}{% endblock %}
+{% endblock %}

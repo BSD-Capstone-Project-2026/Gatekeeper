@@ -1,0 +1,19 @@
+{% extends "services/_layout.html" %}
+{% block title %}{{ item.title }} - Gatekeeper{% endblock %}
+{% block description %}From {{ item.author.first_name }} {{ item.author.last_name }}, building management{% endblock %}
+{% block actions %}<a class="btn btn-secondary" href="{{ url_for('services.announcements') }}"><i class="bi bi-chevron-left me-1"></i>All Announcements</a>{% endblock %}
+
+{% block tab %}
+<article class="card notice-detail">
+    <div class="card-body">
+        <span class="notice-icon"><i class="bi bi-megaphone-fill"></i></span>
+        <h3 class="mt-3 mb-2">{{ item.title }}</h3>
+        <p class="notice-body">{{ item.body }}</p>
+        <small class="text-muted">
+            {{ 'All floors' if not item.floor_list else 'Floor' ~ ('s ' if item.floor_list|length > 1 else ' ') ~ item.floor_list|join(', ') }}
+            · posted <time data-local datetime="{{ item.created_at.isoformat() }}Z"></time>
+            {% if item.expires_at %}· shown until <time data-local datetime="{{ item.expires_at.isoformat() }}Z"></time>{% endif %}
+        </small>
+    </div>
+</article>
+{% endblock %}

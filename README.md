@@ -92,6 +92,7 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 | `/desk/shift-log` | ✅ | ✅ | ❌ | ❌ |
 | `/desk/keys` | ✅ | ✅ | ❌ | ❌ |
 | `/desk/lost-found` | ✅ | ✅ | View unclaimed items | ❌ |
+| `/services/announcements` | Publish and view | View | View for own floor | ❌ |
 | `/simulate` | ❌ | ❌ | ✅ | ✅ |
 | `/profile`, `/profile/incidents`, `/reset-password` | ✅ | ✅ | ✅ | ✅ |
 

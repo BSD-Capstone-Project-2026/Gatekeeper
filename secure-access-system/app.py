@@ -9,6 +9,7 @@ from models import db, User, Door, Zone, AccessLog, AccessLogArchive, add_missin
 from routes.web import access_bp, web_bp
 from routes.visitors import visitors_bp
 from routes.desk import desk_bp
+from routes.services import services_bp
 from routes.auth import auth_bp
 from routes.users import users_bp
 from routes.protected import protected_bp
@@ -80,6 +81,7 @@ def create_app(config=Config):
     app.register_blueprint(access_bp)
     app.register_blueprint(visitors_bp)
     app.register_blueprint(desk_bp)
+    app.register_blueprint(services_bp)
 
     # Database Setup + Seeding
     with app.app_context():

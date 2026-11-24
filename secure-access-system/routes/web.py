@@ -11,7 +11,7 @@ import re
 import socket
 import time
 from datetime import datetime, timedelta
-from models import Incident, Notification, Package, RateLimitBlock, ShiftLogEntry
+from models import Announcement, Incident, Notification, Package, RateLimitBlock, ShiftLogEntry
 from utils.notifications import notify, send_email
 from utils.log_integrity import verify_log_chain
 from utils.proximity import on_building_network, issue_proximity_token, proximity_verified
@@ -271,7 +271,9 @@ def member_home():
         AccessLog.user_id == user.id).order_by(AccessLog.timestamp.desc()).limit(5).all()
     notifications = Notification.query.filter_by(user_id=user.id).order_by(Notification.created_at.desc()).limit(3).all()
     packages = Package.query.filter_by(unit_number=user.unit_number, picked_up_at=None).order_by(Package.logged_at).all() if user.unit_number else []
-    return render_template("home.html", user=user, activity=activity, notifications=notifications, packages=packages,
+    notices = [a for a in Announcement.query.order_by(Announcement.created_at.desc())
+               if a.is_current and a.reaches(user) and not a.read_by(user.id)] if user.role == 'resident' else []
+    return render_template("home.html", user=user, activity=activity, notifications=notifications, packages=packages, notices=notices,
                            unread=Notification.query.filter_by(user_id=user.id, is_read=False).count())
 
 

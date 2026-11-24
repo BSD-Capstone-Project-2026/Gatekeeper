@@ -1,0 +1,78 @@
+{% extends "services/_layout.html" %}
+{% block title %}Announcements - Gatekeeper{% endblock %}
+{% block description %}{% if user.role == 'management' %}Post notices to the whole building or to chosen floors.{% elif user.role == 'resident' %}Notices for your floor from building management.{% else %}Notices currently shown to residents.{% endif %}{% endblock %}
+{% block actions %}{% if user.role == 'management' %}<button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#compose"><i class="bi bi-plus-lg me-1"></i>New Announcement</button>{% endif %}{% endblock %}
+
+{% block tab %}
+<div class="notice-list">
+    {% for a in items %}
+    {% set unread = user.role == 'resident' and not a.read_by(user.id) %}
+    <a class="card notice-card{{ ' is-unread' if unread }}{{ ' is-inactive' if not a.is_current }}" href="{{ url_for('services.open_announcement', announcement_id=a.id) }}">
+        <div class="card-body">
+            <span class="notice-icon"><i class="bi bi-megaphone-fill"></i></span>
+            <div class="flex-grow-1 min-w-0">
+                <div class="d-flex align-items-center gap-2">
+                    {% if unread %}<span class="unread-dot" aria-label="Unread"></span>{% endif %}
+                    <span class="fw-semibold">{{ a.title }}</span>
+                </div>
+                <div class="notice-preview">{{ a.body }}</div>
+                <small class="text-muted">
+                    {{ 'All floors' if not a.floor_list else 'Floor' ~ ('s ' if a.floor_list|length > 1 else ' ') ~ a.floor_list|join(', ') }}
+                    · <time data-local datetime="{{ a.created_at.isoformat() }}Z"></time>
+                    {% if a.expires_at %}· {{ 'until' if a.is_current else 'expired' }} <time data-local datetime="{{ a.expires_at.isoformat() }}Z"></time>{% endif %}
+                </small>
+            </div>
+            <i class="bi bi-chevron-right text-muted"></i>
+        </div>
+    </a>
+    {% else %}
+    <div class="card empty-inline"><div class="card-body text-muted"><i class="bi bi-megaphone me-2"></i>No announcements right now.</div></div>
+    {% endfor %}
+</div>
+
+{% if user.role == 'management' %}
+<div class="modal fade" id="compose" tabindex="-1" aria-labelledby="compose-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content sheet" method="POST" action="{{ url_for('services.publish_announcement') }}">
+            <div class="sheet-header">
+                <button class="btn btn-link" type="button" data-bs-dismiss="modal">Cancel</button>
+                <h5 class="mb-0" id="compose-title">New Announcement</h5>
+                <button class="btn btn-link fw-semibold" type="submit">Publish</button>
+            </div>
+            <div class="modal-body">
+                {% if sheet_error %}<div class="alert alert-danger py-2" role="alert">{{ sheet_error }}</div>{% endif %}
+                <div class="inset-group mb-3">
+                    <label class="inset-row"><span>Title</span><input class="form-control" name="title" maxlength="100" placeholder="e.g. Water off Friday 10–12" value="{{ request.form.get('title', '') }}" required></label>
+                    <label class="inset-row"><span>Expires</span><input class="form-control" type="date" name="expires" value="{{ request.form.get('expires', '') }}"></label>
+                </div>
+                <textarea class="form-control mb-3" name="body" rows="4" maxlength="1000" placeholder="Message" aria-label="Message" required>{{ request.form.get('body', '') }}</textarea>
+                <div class="form-label">Send to</div>
+                <div class="chip-row" id="floor-chips">
+                    {% set chosen = request.form.getlist('floors') or ['all'] %}
+                    <input class="btn-check" type="checkbox" name="floors" id="floor-all" value="all" {{ 'checked' if 'all' in chosen }}>
+                    <label class="chip" for="floor-all">All floors</label>
+                    {% for f in floors %}
+                    <input class="btn-check" type="checkbox" name="floors" id="floor-{{ f }}" value="{{ f }}" {{ 'checked' if f|string in chosen }}>
+                    <label class="chip" for="floor-{{ f }}">Floor {{ f }}</label>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="tz_offset" id="tz-offset">
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block tab_scripts %}
+{% if user.role == 'management' %}
+<script>
+    document.getElementById('tz-offset').value = new Date().getTimezoneOffset();
+    const all = document.getElementById('floor-all');
+    const floors = [...document.querySelectorAll('#floor-chips input:not(#floor-all)')];
+    all.addEventListener('change', () => { if (all.checked) floors.forEach(f => f.checked = false); });
+    floors.forEach(f => f.addEventListener('change', () => { if (f.checked) all.checked = false; }));
+    {% if sheet_error %}bootstrap.Modal.getOrCreateInstance(document.getElementById('compose')).show();{% endif %}
+</script>
+{% endif %}
+{% endblock %}

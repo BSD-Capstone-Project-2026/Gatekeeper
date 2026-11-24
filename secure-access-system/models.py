@@ -384,6 +384,41 @@ class LostItem(db.Model):
     logger = db.relationship('User', foreign_keys=[logged_by])
     returner = db.relationship('User', foreign_keys=[returned_by])
 
+class Announcement(db.Model):
+    __tablename__ = 'announcements'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    body = db.Column(db.String(1000), nullable=False)
+    floors = db.Column(db.String(60), default="")
+    expires_at = db.Column(db.DateTime, nullable=True)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    author = db.relationship('User')
+    reads = db.relationship('AnnouncementRead', backref='announcement', cascade='all, delete-orphan')
+
+    @property
+    def floor_list(self):
+        return [int(f) for f in self.floors.split(",") if f] if self.floors else []
+
+    @property
+    def is_current(self):
+        return not self.expires_at or datetime.utcnow() < self.expires_at
+
+    def reaches(self, user):
+        return not self.floor_list or user.floor in self.floor_list
+
+    def read_by(self, user_id):
+        return any(r.user_id == user_id for r in self.reads)
+
+class AnnouncementRead(db.Model):
+    __tablename__ = 'announcement_reads'
+
+    announcement_id = db.Column(db.Integer, db.ForeignKey('announcements.id'), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
+    read_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 
