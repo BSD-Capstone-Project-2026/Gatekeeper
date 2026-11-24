@@ -69,3 +69,110 @@
     font-size: 1.05rem;
     white-space: pre-line;
 }
+
+.board {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(240px, 1fr));
+    gap: 1rem;
+    overflow-x: auto;
+}
+
+.board-column {
+    padding: 0.75rem;
+    border-radius: 16px;
+    background: var(--app-fill);
+}
+
+.board-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 0.45rem;
+    border-radius: 50%;
+}
+
+.board-card {
+    margin-bottom: 0.6rem;
+}
+
+.board-card .card-body {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.85rem;
+}
+
+.board-text {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.board-empty {
+    padding: 1rem;
+    color: var(--app-text-2);
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.entry-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: 12px;
+    background: var(--app-fill);
+    font-weight: 500;
+}
+
+.entry-banner.is-allowed {
+    background: rgba(var(--bs-success-rgb), 0.14);
+    color: var(--app-green-text);
+}
+
+.status-timeline {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.status-timeline li {
+    position: relative;
+    display: flex;
+    gap: 0.8rem;
+    padding-bottom: 1.1rem;
+    color: var(--app-text-2);
+}
+
+.status-timeline li::before {
+    position: absolute;
+    top: 14px;
+    bottom: 0;
+    left: 6px;
+    width: 2px;
+    background: var(--app-separator);
+    content: "";
+}
+
+.status-timeline li:last-child::before {
+    display: none;
+}
+
+.timeline-dot {
+    position: relative;
+    z-index: 1;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    margin-top: 4px;
+    border: 2px solid var(--app-separator);
+    border-radius: 50%;
+    background: var(--app-surface);
+}
+
+.status-timeline li.is-done {
+    color: var(--app-text);
+}
+
+.status-timeline li.is-done .timeline-dot {
+    border-color: rgb(var(--bs-primary-rgb));
+    background: rgb(var(--bs-primary-rgb));
+}

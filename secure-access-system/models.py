@@ -419,6 +419,23 @@ class AnnouncementRead(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
     read_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class MaintenanceRequest(db.Model):
+    __tablename__ = 'maintenance_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    resident_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    unit_number = db.Column(db.String(10), nullable=True)
+    category = db.Column(db.String(30), nullable=False)
+    description = db.Column(db.String(500), nullable=False)
+    entry_allowed = db.Column(db.Boolean, default=False)
+    status = db.Column(db.String(20), default='Open')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=True)
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    resident = db.relationship('User', foreign_keys=[resident_id])
+    updater = db.relationship('User', foreign_keys=[updated_by])
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 

@@ -1,0 +1,39 @@
+{% extends "services/_layout.html" %}
+{% block title %}Maintenance - Gatekeeper{% endblock %}
+{% block description %}Every resident request, from reported to fixed. Moving a request notifies the resident.{% endblock %}
+
+{% block tab %}
+{% set tones = {'Open': 'warning', 'In Progress': 'primary', 'Completed': 'success'} %}
+<div class="board">
+    {% for status in statuses %}
+    <section class="board-column">
+        <h6 class="section-title"><span class="board-dot bg-{{ tones[status] }}"></span>{{ status }} · {{ board[status]|length }}</h6>
+        {% for r in board[status] %}
+        <article class="card board-card">
+            <div class="card-body">
+                <div class="d-flex align-items-start gap-2">
+                    <span class="unit-pill">{{ r.unit_number or '—' }}</span>
+                    <a class="fw-semibold flex-grow-1 text-reset text-decoration-none" href="{{ url_for('services.maintenance_detail', request_id=r.id) }}">{{ r.category }}</a>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-icon" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Move request {{ r.id }}"><i class="bi bi-three-dots"></i></button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            {% for s in statuses if s != status %}
+                            <li><form method="POST" action="{{ url_for('services.update_maintenance', request_id=r.id) }}"><input type="hidden" name="status" value="{{ s }}"><button class="dropdown-item" type="submit"><i class="bi bi-arrow-right-circle"></i>Move to {{ s }}</button></form></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                <p class="board-text">{{ r.description }}</p>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    {% if r.entry_allowed %}<span class="badge bg-success"><i class="bi bi-key me-1"></i>Entry permitted</span>{% else %}<span class="badge bg-secondary">Resident must be home</span>{% endif %}
+                    <small class="text-muted ms-auto">{{ r.resident.first_name }} · <time data-local datetime="{{ r.created_at.isoformat() }}Z"></time></small>
+                </div>
+            </div>
+        </article>
+        {% else %}
+        <div class="board-empty">Nothing here</div>
+        {% endfor %}
+    </section>
+    {% endfor %}
+</div>
+{% endblock %}

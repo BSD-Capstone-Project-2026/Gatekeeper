@@ -2,13 +2,17 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
 
-from models import db, Announcement, AnnouncementRead, User
+from models import db, Announcement, AnnouncementRead, MaintenanceRequest, User
 from routes.decorators import role_required
 from routes.web import login_required
 from routes.visitors import STAFF, current_user
 from routes.desk import clean
+from utils.notifications import notify
 
 services_bp = Blueprint("services", __name__, url_prefix="/services")
+
+MAINTENANCE_CATEGORIES = ("Plumbing", "Electrical", "Heating and cooling", "Appliance", "Other")
+MAINTENANCE_STATUSES = ("Open", "In Progress", "Completed")
 
 
 def resident_floors():
@@ -63,3 +67,56 @@ def open_announcement(announcement_id):
             db.session.add(AnnouncementRead(announcement_id=item.id, user_id=user.id))
             db.session.commit()
     return render_template("services/announcement.html", item=item)
+
+
+@services_bp.route("/maintenance")
+@login_required
+@role_required('resident', *STAFF)
+def maintenance(error=None, status=200):
+    if session['user_role'] in STAFF:
+        requests = MaintenanceRequest.query.order_by(MaintenanceRequest.created_at.desc()).all()
+        board = {s: [r for r in requests if r.status == s] for s in MAINTENANCE_STATUSES}
+        return render_template("services/maintenance_board.html", board=board, statuses=MAINTENANCE_STATUSES)
+    mine = MaintenanceRequest.query.filter_by(resident_id=session['user_id']).order_by(MaintenanceRequest.created_at.desc()).all()
+    return render_template("services/maintenance.html", requests=mine, categories=MAINTENANCE_CATEGORIES, sheet_error=error), status
+
+
+@services_bp.route("/maintenance", methods=["POST"])
+@login_required
+@role_required('resident')
+def submit_maintenance():
+    category = request.form.get("category")
+    description = (request.form.get("description") or "").strip()[:500]
+    if category not in MAINTENANCE_CATEGORIES or not description:
+        return maintenance(error="Choose a category and describe the problem.", status=400)
+    resident = current_user()
+    db.session.add(MaintenanceRequest(resident_id=resident.id, unit_number=resident.unit_number, category=category,
+                                      description=description, entry_allowed=request.form.get("entry") == "on"))
+    db.session.commit()
+    return redirect(url_for("services.maintenance"))
+
+
+@services_bp.route("/maintenance/<int:request_id>")
+@login_required
+@role_required('resident', *STAFF)
+def maintenance_detail(request_id):
+    item = MaintenanceRequest.query.get_or_404(request_id)
+    if session['user_role'] == 'resident' and item.resident_id != session['user_id']:
+        abort(403)
+    return render_template("services/maintenance_detail.html", item=item, statuses=MAINTENANCE_STATUSES)
+
+
+@services_bp.route("/maintenance/<int:request_id>/status", methods=["POST"])
+@login_required
+@role_required(*STAFF)
+def update_maintenance(request_id):
+    item = MaintenanceRequest.query.get_or_404(request_id)
+    new_status = request.form.get("status")
+    if new_status in MAINTENANCE_STATUSES and new_status != item.status:
+        item.status = new_status
+        item.updated_at = datetime.utcnow()
+        item.updated_by = session['user_id']
+        db.session.commit()
+        notify(item.resident, f"Maintenance request {new_status.lower()}",
+               f"Your {item.category.lower()} request \"{item.description[:60]}\" is now {new_status}.")
+    return redirect(url_for("services.maintenance"))

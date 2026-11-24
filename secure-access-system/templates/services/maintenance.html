@@ -1,0 +1,60 @@
+{% extends "services/_layout.html" %}
+{% block title %}Maintenance - Gatekeeper{% endblock %}
+{% block description %}Report a problem in your unit and follow it until it is fixed.{% endblock %}
+{% block actions %}<button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#new-request"><i class="bi bi-plus-lg me-1"></i>New Request</button>{% endblock %}
+
+{% block tab %}
+{% set pills = {'Open': 'bg-warning', 'In Progress': 'bg-primary', 'Completed': 'bg-success'} %}
+<div class="notice-list">
+    {% for r in requests %}
+    <a class="card notice-card{{ ' is-inactive' if r.status == 'Completed' }}" href="{{ url_for('services.maintenance_detail', request_id=r.id) }}">
+        <div class="card-body">
+            <span class="notice-icon"><i class="bi bi-tools"></i></span>
+            <div class="flex-grow-1 min-w-0">
+                <div class="fw-semibold">{{ r.category }}</div>
+                <div class="notice-preview">{{ r.description }}</div>
+                <small class="text-muted">Sent <time data-local datetime="{{ r.created_at.isoformat() }}Z"></time>{% if r.entry_allowed %} · staff may enter{% endif %}</small>
+            </div>
+            <span class="badge {{ pills[r.status] }}">{{ r.status }}</span>
+        </div>
+    </a>
+    {% else %}
+    <div class="empty-state card">
+        <div class="card-body">
+            <span class="stat-icon tone-primary"><i class="bi bi-tools"></i></span>
+            <h5>No requests yet</h5>
+            <p class="text-muted">Tell building staff about a leak, a broken appliance or anything else that needs fixing.</p>
+            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#new-request">New Request</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="modal fade" id="new-request" tabindex="-1" aria-labelledby="new-request-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content sheet" method="POST" action="{{ url_for('services.submit_maintenance') }}">
+            <div class="sheet-header">
+                <button class="btn btn-link" type="button" data-bs-dismiss="modal">Cancel</button>
+                <h5 class="mb-0" id="new-request-title">New Request</h5>
+                <button class="btn btn-link fw-semibold" type="submit">Send</button>
+            </div>
+            <div class="modal-body">
+                {% if sheet_error %}<div class="alert alert-danger py-2" role="alert">{{ sheet_error }}</div>{% endif %}
+                <div class="inset-group mb-3">
+                    <label class="inset-row"><span>Category</span>
+                        <select class="form-select border-0 bg-transparent text-end" name="category" required>
+                            {% for c in categories %}<option {{ 'selected' if c == request.form.get('category') }}>{{ c }}</option>{% endfor %}
+                        </select>
+                    </label>
+                    <label class="inset-row toggle-row"><span>OK to enter my unit</span><input class="form-check-input ms-auto" type="checkbox" role="switch" name="entry" {{ 'checked' if request.form.get('entry') }}></label>
+                </div>
+                <textarea class="form-control" name="description" rows="4" maxlength="500" placeholder="What needs fixing? e.g. Leaking kitchen tap" aria-label="Description" required>{{ request.form.get('description', '') }}</textarea>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block tab_scripts %}
+{% if sheet_error %}<script>bootstrap.Modal.getOrCreateInstance(document.getElementById('new-request')).show();</script>{% endif %}
+{% endblock %}
