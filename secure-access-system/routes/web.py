@@ -11,7 +11,7 @@ import re
 import socket
 import time
 from datetime import datetime, timedelta
-from models import Amenity, Announcement, Incident, Notification, Package, RateLimitBlock, ShiftLogEntry, active_booking
+from models import Amenity, Announcement, Incident, MoveRequest, Notification, Package, RateLimitBlock, ShiftLogEntry, active_booking
 from utils.notifications import notify, send_email
 from utils.log_integrity import verify_log_chain
 from utils.proximity import on_building_network, issue_proximity_token, proximity_verified
@@ -257,6 +257,7 @@ def front_desk():
         unlocked_count=Door.query.filter_by(is_locked=False).count(),
         entries_today=todays_logs.filter(AccessLog.success == True).count(),
         denied_today=todays_logs.filter(AccessLog.success == False).count(),
+        todays_moves=MoveRequest.query.filter_by(status='Approved', move_date=datetime.now().date()).order_by(MoveRequest.slot).all(),
         handovers=ShiftLogEntry.query.filter(ShiftLogEntry.is_handover == True, ShiftLogEntry.acknowledged_at.is_(None),
                                              ShiftLogEntry.author_id != session['user_id']).order_by(ShiftLogEntry.created_at).all(),
         watchlist_alerts=AuditLog.query.filter(AuditLog.action == 'watchlist_blocked',

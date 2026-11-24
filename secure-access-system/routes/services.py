@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
 
-from models import db, Amenity, AmenityBooking, Announcement, AnnouncementRead, MaintenanceRequest, User
+from models import db, Amenity, AmenityBooking, Announcement, AnnouncementRead, MaintenanceRequest, MoveRequest, User
 from routes.decorators import role_required
 from routes.web import login_required
 from routes.visitors import STAFF, current_user
@@ -14,6 +14,8 @@ services_bp = Blueprint("services", __name__, url_prefix="/services")
 MAINTENANCE_CATEGORIES = ("Plumbing", "Electrical", "Heating and cooling", "Appliance", "Other")
 MAINTENANCE_STATUSES = ("Open", "In Progress", "Completed")
 BOOKING_DAYS = 7
+MOVE_KINDS = ("Move-in", "Move-out")
+MOVE_SLOTS = {"Morning": "08:00–11:00", "Afternoon": "12:00–15:00", "Evening": "16:00–19:00"}
 
 
 def resident_floors():
@@ -199,3 +201,58 @@ def cancel_booking(booking_id):
         booking.cancelled_at = datetime.utcnow()
         db.session.commit()
     return redirect(url_for("services.amenities", amenity=booking.amenity_id))
+
+
+@services_bp.route("/moves")
+@login_required
+@role_required('resident', *STAFF)
+def moves(error=None, status=200):
+    if session['user_role'] in STAFF:
+        upcoming = MoveRequest.query.filter(MoveRequest.status == 'Approved', MoveRequest.move_date >= date.today())
+        pending = MoveRequest.query.filter_by(status='Pending').order_by(MoveRequest.move_date).all() if session['user_role'] == 'management' else []
+        return render_template("services/moves_staff.html", pending=pending, upcoming=upcoming.order_by(MoveRequest.move_date).all(),
+                               slots=MOVE_SLOTS, error=error), status
+    mine = MoveRequest.query.filter_by(resident_id=session['user_id']).order_by(MoveRequest.move_date.desc()).all()
+    return render_template("services/moves.html", requests=mine, kinds=MOVE_KINDS, slots=MOVE_SLOTS, today=date.today(), error=error), status
+
+
+@services_bp.route("/moves", methods=["POST"])
+@login_required
+@role_required('resident')
+def request_move():
+    kind, slot = request.form.get("kind"), request.form.get("slot")
+    try:
+        move_date = datetime.strptime(request.form.get("date", ""), "%Y-%m-%d").date()
+    except ValueError:
+        move_date = None
+    if kind not in MOVE_KINDS or slot not in MOVE_SLOTS or not move_date or move_date < date.today():
+        return moves(error="Choose move-in or move-out, a date from today onward and a time slot.", status=400)
+    resident = current_user()
+    db.session.add(MoveRequest(resident_id=resident.id, unit_number=resident.unit_number, kind=kind, move_date=move_date, slot=slot))
+    db.session.commit()
+    return redirect(url_for("services.moves"))
+
+
+@services_bp.route("/moves/<int:move_id>/<any(approve, reject):decision>", methods=["POST"])
+@login_required
+@role_required('management')
+def decide_move(move_id, decision):
+    move = MoveRequest.query.get_or_404(move_id)
+    if move.status != 'Pending':
+        return redirect(url_for("services.moves"))
+    reason = clean(request.form.get("reason"), 200)
+    if decision == 'approve':
+        clash = MoveRequest.query.filter(MoveRequest.id != move.id, MoveRequest.status == 'Approved',
+                                         MoveRequest.move_date == move.move_date, MoveRequest.slot == move.slot).first()
+        if clash:
+            return moves(error=f"Unit {clash.unit_number or '—'} already has the service elevator on {move.move_date:%b %d} ({move.slot}).", status=400)
+    elif not reason:
+        return moves(error="Give a reason when rejecting a move.", status=400)
+    move.status = 'Approved' if decision == 'approve' else 'Rejected'
+    move.reason = reason or None
+    move.decided_at = datetime.utcnow()
+    move.decided_by = session['user_id']
+    db.session.commit()
+    message = f"Your {move.kind.lower()} on {move.move_date:%b %d} ({move.slot}, {MOVE_SLOTS[move.slot]}) was {move.status.lower()}."
+    notify(move.resident, f"{move.kind} {move.status.lower()}", message + (f" Reason: {reason}" if move.status == 'Rejected' else ""))
+    return redirect(url_for("services.moves"))

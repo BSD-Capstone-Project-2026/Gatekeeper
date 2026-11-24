@@ -18,6 +18,18 @@
     </div>
 </div>
 {% endfor %}
+{% if todays_moves %}
+<div class="card handover-card mb-3">
+    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+        <span class="stat-icon tone-primary"><i class="bi bi-truck"></i></span>
+        <div class="fw-semibold me-2">Today's Moves</div>
+        {% for m in todays_moves %}
+        <span class="move-chip"><span class="unit-pill">{{ m.unit_number or '—' }}</span>{{ m.kind }} · {{ m.slot }}</span>
+        {% endfor %}
+        <a class="ms-auto btn btn-sm btn-secondary" href="{{ url_for('services.moves') }}">All Moves</a>
+    </div>
+</div>
+{% endif %}
 {% for alert in watchlist_alerts %}
 <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
     <i class="bi bi-shield-x"></i>

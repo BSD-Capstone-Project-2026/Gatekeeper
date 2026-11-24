@@ -1,0 +1,59 @@
+{% extends "services/_layout.html" %}
+{% block title %}Moves - Gatekeeper{% endblock %}
+{% block description %}Book the service elevator for your move. Management approves each request so moves never clash.{% endblock %}
+
+{% block tab %}
+{% set pills = {'Pending': 'bg-warning', 'Approved': 'bg-success', 'Rejected': 'bg-danger'} %}
+<div class="row g-4">
+    <div class="col-lg-5">
+        <form class="card" method="POST" action="{{ url_for('services.request_move') }}">
+            <div class="card-body">
+                <h5 class="mb-3">Request a move</h5>
+                <div class="segmented segmented-block mb-3" role="radiogroup" aria-label="Move type">
+                    {% for k in kinds %}
+                    <input class="btn-check" type="radio" name="kind" id="kind-{{ loop.index }}" value="{{ k }}" {{ 'checked' if k == request.form.get('kind', kinds[0]) }}>
+                    <label class="segmented-item" for="kind-{{ loop.index }}">{{ k }}</label>
+                    {% endfor %}
+                </div>
+                <label class="form-label" for="move-date">Date</label>
+                <input class="form-control mb-3" type="date" id="move-date" name="date" min="{{ today.isoformat() }}" value="{{ request.form.get('date', '') }}" required>
+                <div class="form-label">Service elevator slot</div>
+                <div class="slot-grid mb-3" role="radiogroup" aria-label="Time slot">
+                    {% for name, hours in slots.items() %}
+                    <input class="btn-check" type="radio" name="slot" id="slot-{{ loop.index }}" value="{{ name }}" {{ 'checked' if name == request.form.get('slot', 'Morning') }}>
+                    <label class="slot slot-choice" for="slot-{{ loop.index }}"><span class="slot-time">{{ name }}</span><span class="slot-state">{{ hours }}</span></label>
+                    {% endfor %}
+                </div>
+                <button class="btn btn-primary btn-lg w-100" type="submit">Request Move</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="col-lg-7">
+        <h6 class="section-title">Your requests</h6>
+        <div class="notice-list">
+            {% for m in requests %}
+            <article class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="notice-icon"><i class="bi bi-truck"></i></span>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">{{ m.kind }} · {{ m.move_date.strftime('%a %b %d') }}</div>
+                            <small class="text-muted">{{ m.slot }}, {{ slots[m.slot] }}</small>
+                        </div>
+                        <span class="badge {{ pills[m.status] }}">{{ m.status }}</span>
+                    </div>
+                    <ol class="status-timeline status-inline">
+                        <li class="is-done"><span class="timeline-dot"></span><div>Requested</div></li>
+                        <li class="{{ 'is-done' if m.status != 'Pending' }}{{ ' is-rejected' if m.status == 'Rejected' }}"><span class="timeline-dot"></span><div>{{ 'Waiting for management' if m.status == 'Pending' else m.status }}</div></li>
+                    </ol>
+                    {% if m.status == 'Rejected' and m.reason %}<div class="entry-banner mt-2"><i class="bi bi-info-circle"></i>{{ m.reason }}</div>{% endif %}
+                </div>
+            </article>
+            {% else %}
+            <div class="card empty-inline"><div class="card-body text-muted"><i class="bi bi-truck me-2"></i>No move requests yet.</div></div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -476,6 +476,24 @@ def active_booking(user, door):
                                                      AmenityBooking.starts_at <= now + timedelta(minutes=10),
                                                      AmenityBooking.starts_at > now - timedelta(hours=1)).first()
 
+class MoveRequest(db.Model):
+    __tablename__ = 'move_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    resident_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    unit_number = db.Column(db.String(10), nullable=True)
+    kind = db.Column(db.String(10), nullable=False)
+    move_date = db.Column(db.Date, nullable=False, index=True)
+    slot = db.Column(db.String(10), nullable=False)
+    status = db.Column(db.String(10), default='Pending')
+    reason = db.Column(db.String(200), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    decided_at = db.Column(db.DateTime, nullable=True)
+    decided_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    resident = db.relationship('User', foreign_keys=[resident_id])
+    decider = db.relationship('User', foreign_keys=[decided_by])
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 

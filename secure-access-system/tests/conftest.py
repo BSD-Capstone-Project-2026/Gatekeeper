@@ -13,7 +13,7 @@ GROUPS = {
                "test_incident_filter", "test_live_activity", "test_log_filters", "test_network_health", "test_notifications", "test_offline_indicator"},
     "visitors": {"test_lobby_requests", "test_parking_permits", "test_visitor_passes", "test_watchlist"},
     "desk": {"test_key_register", "test_lost_found", "test_packages", "test_shift_log"},
-    "services": {"test_amenities", "test_announcements", "test_maintenance"}
+    "services": {"test_amenities", "test_announcements", "test_maintenance", "test_moves"}
 }
 
 

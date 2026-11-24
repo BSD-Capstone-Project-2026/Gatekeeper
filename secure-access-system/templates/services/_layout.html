@@ -12,7 +12,8 @@
 {% set services_tabs = [
     ('services.announcements', 'megaphone', 'Announcements', ['services.announcements', 'services.publish_announcement', 'services.open_announcement']),
     ('services.maintenance', 'tools', 'Maintenance', ['services.maintenance', 'services.submit_maintenance', 'services.maintenance_detail']),
-    ('services.amenities', 'calendar-check', 'Amenities', ['services.amenities', 'services.book_amenity'])
+    ('services.amenities', 'calendar-check', 'Amenities', ['services.amenities', 'services.book_amenity']),
+    ('services.moves', 'truck', 'Moves', ['services.moves', 'services.request_move', 'services.decide_move'])
 ] %}
 {% if services_tabs|length > 1 %}
 <nav class="segmented mb-4" aria-label="Services sections">

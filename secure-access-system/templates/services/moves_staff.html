@@ -1,0 +1,54 @@
+{% extends "services/_layout.html" %}
+{% block title %}Moves - Gatekeeper{% endblock %}
+{% block description %}{% if session.user_role == 'management' %}Approve service elevator bookings. A slot can only hold one approved move.{% else %}Approved moves using the service elevator.{% endif %}{% endblock %}
+
+{% block tab %}
+<div class="row g-4">
+    {% if session.user_role == 'management' %}
+    <div class="col-lg-7">
+        <h6 class="section-title">Waiting for approval · {{ pending|length }}</h6>
+        <div class="notice-list">
+            {% for m in pending %}
+            <article class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="unit-pill">{{ m.unit_number or '—' }}</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">{{ m.kind }} · {{ m.move_date.strftime('%a %b %d') }}</div>
+                            <small class="text-muted">{{ m.slot }}, {{ slots[m.slot] }} · {{ m.resident.first_name }} {{ m.resident.last_name }}</small>
+                        </div>
+                        <form method="POST" action="{{ url_for('services.decide_move', move_id=m.id, decision='approve') }}"><button class="btn btn-primary" type="submit">Approve</button></form>
+                    </div>
+                    <form class="d-flex gap-2" method="POST" action="{{ url_for('services.decide_move', move_id=m.id, decision='reject') }}">
+                        <input class="form-control form-control-sm" name="reason" maxlength="200" placeholder="Reason for rejecting" aria-label="Reason for rejecting {{ m.unit_number }}" required>
+                        <button class="btn btn-sm btn-secondary" type="submit">Reject</button>
+                    </form>
+                </div>
+            </article>
+            {% else %}
+            <div class="card empty-inline"><div class="card-body text-muted"><i class="bi bi-check2-circle me-2"></i>No requests waiting.</div></div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="{{ 'col-lg-5' if session.user_role == 'management' else 'col-lg-8' }}">
+        <h6 class="section-title">Approved moves</h6>
+        <div class="card">
+            <ul class="list-group list-group-flush">
+                {% for m in upcoming %}
+                <li class="list-group-item booking-row">
+                    <span class="unit-pill">{{ m.unit_number or '—' }}</span>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">{{ m.move_date.strftime('%a %b %d') }} · {{ m.slot }}</div>
+                        <small class="text-muted">{{ m.kind }} · {{ slots[m.slot] }}</small>
+                    </div>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">No approved moves.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
