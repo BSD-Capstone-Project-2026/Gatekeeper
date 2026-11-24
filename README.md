@@ -94,6 +94,7 @@ Gatekeeper modernizes building entry by issuing **encrypted virtual keys** inste
 | `/desk/lost-found` | ✅ | ✅ | View unclaimed items | ❌ |
 | `/services/announcements` | Publish and view | View | View for own floor | ❌ |
 | `/services/maintenance` | Manage all requests | Manage all requests | Own requests | ❌ |
+| `/services/amenities` | Today's bookings | Today's bookings | Book, cancel, open the amenity door during a booking | ❌ |
 | `/simulate` | ❌ | ❌ | ✅ | ✅ |
 | `/profile`, `/profile/incidents`, `/reset-password` | ✅ | ✅ | ✅ | ✅ |
 

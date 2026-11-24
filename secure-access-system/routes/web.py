@@ -11,7 +11,7 @@ import re
 import socket
 import time
 from datetime import datetime, timedelta
-from models import Announcement, Incident, Notification, Package, RateLimitBlock, ShiftLogEntry
+from models import Amenity, Announcement, Incident, Notification, Package, RateLimitBlock, ShiftLogEntry, active_booking
 from utils.notifications import notify, send_email
 from utils.log_integrity import verify_log_chain
 from utils.proximity import on_building_network, issue_proximity_token, proximity_verified
@@ -315,6 +315,9 @@ def request_access():
     # Determine if user is allowed by role/unit
     permission = user.role in DOOR_ROLES.get(door.door_type, set()) or (
         door.door_type == 'unit' and user.role == 'resident' and door.associated_unit == user.unit_number)
+    amenity_door = user.role == 'resident' and Amenity.query.filter_by(door_id=door.id).first() is not None
+    if amenity_door:
+        permission = active_booking(user, door) is not None
 
     # Zone check
     zone_ok = True
@@ -329,7 +332,7 @@ def request_access():
     reasons = []
     if not success:
         if not permission:
-            reasons.append("permission denied")
+            reasons.append("No active booking" if amenity_door else "permission denied")
         if not wifi_ok:
             reasons.append("network not trusted")
         if not proximity_ok:
@@ -412,7 +415,7 @@ def request_access():
     if success:
         return jsonify({"message": "Door unlocked", "access_granted": True}), 200
     else:
-        return jsonify({"error": "Access denied", "access_granted": False}), 403
+        return jsonify({"error": "Access denied", "reason": failure_reason, "access_granted": False}), 403
 
 @web_bp.route("/api/notifications")
 @login_required

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models import db, User, Door, Zone, AccessLog, Incident, Notification, AuditLog, BuildingKey, EntryRequest, KeyLoan, LostItem, Package, ParkingPermit, ShiftLogEntry, VisitorPass, WatchlistEntry
+from models import db, User, Door, Zone, AccessLog, Incident, Notification, AuditLog, BuildingKey, Amenity, EntryRequest, KeyLoan, LostItem, Package, ParkingPermit, ShiftLogEntry, VisitorPass, WatchlistEntry
 
 DOMAIN = "gatekeeper.demo"
 STAFF = [("management", "Maya", "Chen"), ("management", "Daniel", "Okafor"),
@@ -15,6 +15,7 @@ RESIDENTS = [("Aisha", "Khan"), ("Ben", "Carter"), ("Chloe", "Nguyen"), ("Diego"
 UNITS = [f"{floor}{letter}" for floor in range(2, 7) for letter in "AB"]
 ZONES = {"Ground": "Ground floor", "Gym": "Fitness area", "Amenities": "Common amenities", "Rooftop": "Rooftop terrace"}
 COMMON_DOORS = [("Gym Door", "Level 1", "Gym"), ("Amenities Room Door", "Level 1", "Amenities"), ("Rooftop Door", "Roof", "Rooftop")]
+AMENITIES = [("Gym", "Gym Door", 6, 22, 4), ("Party Room", "Amenities Room Door", 10, 23, 1), ("Rooftop", "Rooftop Door", 8, 22, 8)]
 BUILDING_KEYS = [("Boiler Room", "Basement"), ("Electrical Room", "Basement"), ("Elevator Machine Room", "Roof"), ("Pool Pump Room", "Level 1"), ("Roof Access", "Roof")]
 
 
@@ -166,6 +167,8 @@ def seed_demo(password):
     cleaner.zones = list(zones.values())
     guest.zones = [zones["Ground"]]
     keys = {name: get_or_create(BuildingKey, {"name": name}, location=location) for name, location in BUILDING_KEYS}
+    amenities = {name: get_or_create(Amenity, {"name": name}, door_id=common[door].id, opens_hour=opens, closes_hour=closes, capacity=capacity)
+                 for name, door, opens, closes, capacity in AMENITIES}
     seed_visitors(staff, residents)
     seed_front_desk(staff, keys)
 

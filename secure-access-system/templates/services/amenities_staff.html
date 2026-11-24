@@ -1,0 +1,41 @@
+{% extends "services/_layout.html" %}
+{% block title %}Amenities - Gatekeeper{% endblock %}
+{% block description %}Today's amenity bookings. Residents' amenity doors open only during their booked hour.{% endblock %}
+
+{% block tab %}
+<div class="amenity-row mb-4">
+    {% for a in amenities %}
+    {% set count = bookings|selectattr('amenity_id', 'equalto', a.id)|list|length %}
+    <div class="card amenity-card">
+        <div class="card-body">
+            <span class="notice-icon"><i class="bi bi-{{ {'Gym': 'heart-pulse', 'Rooftop': 'brightness-high', 'Party Room': 'balloon'}.get(a.name, 'building') }}"></i></span>
+            <div>
+                <div class="fw-semibold">{{ a.name }}</div>
+                <small class="text-muted">{{ count }} booking{{ '' if count == 1 else 's' }} today · {{ a.door.name if a.door else 'No door' }}</small>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<h6 class="section-title">Today</h6>
+<div class="card">
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+            <thead><tr><th>Time</th><th>Amenity</th><th>Resident</th><th>Unit</th></tr></thead>
+            <tbody>
+                {% for b in bookings %}
+                <tr>
+                    <td class="fw-semibold">{{ b.starts_at.strftime('%H:%M') }}–{{ b.ends_at.strftime('%H:%M') }}</td>
+                    <td>{{ b.amenity.name }}</td>
+                    <td>{{ b.user.first_name }} {{ b.user.last_name }}</td>
+                    <td><span class="unit-pill">{{ b.user.unit_number or '—' }}</span></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-muted">No bookings today.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

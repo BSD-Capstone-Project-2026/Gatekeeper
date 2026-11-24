@@ -1,0 +1,88 @@
+{% extends "services/_layout.html" %}
+{% block title %}Amenities - Gatekeeper{% endblock %}
+{% block description %}Book a one-hour slot. The amenity door opens for you from 10 minutes before your booking until it ends.{% endblock %}
+
+{% block tab %}
+{% if not choices %}
+<div class="card empty-inline"><div class="card-body text-muted"><i class="bi bi-calendar-x me-2"></i>No amenities are open for booking.</div></div>
+{% else %}
+<div class="amenity-row mb-4">
+    {% for a in choices %}
+    <a class="card amenity-card{{ ' is-selected' if a.id == amenity.id }}" href="{{ url_for('services.amenities', amenity=a.id, day=day.strftime('%Y-%m-%d')) }}">
+        <div class="card-body">
+            <span class="notice-icon"><i class="bi bi-{{ {'Gym': 'heart-pulse', 'Rooftop': 'brightness-high', 'Party Room': 'balloon'}.get(a.name, 'building') }}"></i></span>
+            <div>
+                <div class="fw-semibold">{{ a.name }}</div>
+                <small class="text-muted">{{ '%02d:00'|format(a.opens_hour) }}–{{ '%02d:00'|format(a.closes_hour) }} · up to {{ a.capacity }}</small>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="chip-row mb-3" role="tablist" aria-label="Day">
+            {% for d in days %}
+            <a class="chip day-chip{{ ' is-active' if d == day }}" href="{{ url_for('services.amenities', amenity=amenity.id, day=d.strftime('%Y-%m-%d')) }}">{{ 'Today' if loop.first else d.strftime('%a %d') }}</a>
+            {% endfor %}
+        </div>
+        <div class="slot-grid">
+            {% for s in slots %}
+            {% set left = amenity.capacity - s.booked %}
+            <form method="POST" action="{{ url_for('services.book_amenity') }}">
+                <input type="hidden" name="amenity" value="{{ amenity.id }}">
+                <input type="hidden" name="start" value="{{ s.start.strftime('%Y-%m-%dT%H:%M') }}">
+                <input type="hidden" name="day" value="{{ day.strftime('%Y-%m-%d') }}">
+                <button class="slot{{ ' is-mine' if s.mine }}{{ ' is-full' if left <= 0 and not s.mine }}" type="submit" {{ 'disabled' if s.past or s.mine or left <= 0 }}>
+                    <span class="slot-time">{{ s.start.strftime('%H:%M') }}</span>
+                    <span class="slot-state">{% if s.mine %}Booked{% elif s.past %}Past{% elif left <= 0 %}Full{% else %}{{ left }} left{% endif %}</span>
+                </button>
+            </form>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <h6 class="section-title">My bookings</h6>
+        <div class="card">
+            <ul class="list-group list-group-flush">
+                {% for b in bookings %}
+                <li class="list-group-item booking-row">
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">{{ b.amenity.name }}</div>
+                        <small class="text-muted">{{ b.starts_at.strftime('%a %b %d · %H:%M') }}–{{ b.ends_at.strftime('%H:%M') }}</small>
+                        <div class="door-result small" id="door-result-{{ b.id }}"></div>
+                    </div>
+                    {% if b.door_open and b.amenity.door %}
+                    <button class="btn btn-sm btn-primary" type="button" data-door="{{ b.amenity.door_id }}" data-booking="{{ b.id }}" onclick="openDoor(this)"><i class="bi bi-door-open me-1"></i>Open Door</button>
+                    {% endif %}
+                    {% if b.starts_at > now %}
+                    <form method="POST" action="{{ url_for('services.cancel_booking', booking_id=b.id) }}"><button class="btn btn-sm btn-secondary" type="submit">Cancel</button></form>
+                    {% endif %}
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">No upcoming bookings.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block tab_scripts %}
+<script>
+    const JWT = {{ session.get('jwt_token')|tojson }};
+    async function openDoor(button) {
+        const result = document.getElementById('door-result-' + button.dataset.booking);
+        const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${JWT}` };
+        const beacon = await fetch(`/api/access/beacon/${button.dataset.door}`, { headers });
+        const token = beacon.ok ? (await beacon.json()).proximity_token : null;
+        const res = await fetch('/api/access/request', { method: 'POST', headers, body: JSON.stringify({ door_id: Number(button.dataset.door), proximity_token: token }) });
+        const data = await res.json();
+        result.className = 'door-result small ' + (res.ok ? 'text-success' : 'text-danger');
+        result.textContent = res.ok ? 'Door unlocked' : `Denied: ${data.reason || data.error}`;
+    }
+</script>
+{% endblock %}

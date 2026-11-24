@@ -176,3 +176,87 @@
     border-color: rgb(var(--bs-primary-rgb));
     background: rgb(var(--bs-primary-rgb));
 }
+
+.amenity-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.75rem;
+}
+
+.amenity-card {
+    color: inherit;
+    text-decoration: none;
+    border: 2px solid transparent;
+}
+
+.amenity-card:hover {
+    color: inherit;
+}
+
+.amenity-card.is-selected {
+    border-color: rgb(var(--bs-primary-rgb));
+}
+
+.amenity-card .card-body {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.9rem;
+}
+
+.day-chip {
+    text-decoration: none;
+}
+
+.day-chip.is-active {
+    background: rgb(var(--bs-primary-rgb));
+    color: #ffffff;
+}
+
+.slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 0.5rem;
+}
+
+.slot {
+    display: grid;
+    width: 100%;
+    padding: 0.6rem 0.4rem;
+    border: 0;
+    border-radius: 12px;
+    background: rgba(var(--bs-primary-rgb), 0.12);
+    color: var(--app-accent-text);
+    text-align: center;
+    transition: transform 0.15s ease;
+}
+
+.slot:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+.slot:disabled {
+    background: var(--app-fill);
+    color: var(--app-text-2);
+}
+
+.slot.is-mine {
+    background: rgba(var(--bs-success-rgb), 0.16);
+    color: var(--app-green-text);
+}
+
+.slot-time {
+    font-weight: 600;
+}
+
+.slot-state {
+    font-size: 0.78rem;
+}
+
+.booking-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 1rem;
+}

@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session
 import bcrypt
@@ -435,6 +435,46 @@ class MaintenanceRequest(db.Model):
 
     resident = db.relationship('User', foreign_keys=[resident_id])
     updater = db.relationship('User', foreign_keys=[updated_by])
+
+class Amenity(db.Model):
+    __tablename__ = 'amenities'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(40), unique=True, nullable=False)
+    door_id = db.Column(db.Integer, db.ForeignKey('doors.id'), nullable=True)
+    opens_hour = db.Column(db.Integer, nullable=False)
+    closes_hour = db.Column(db.Integer, nullable=False)
+    capacity = db.Column(db.Integer, nullable=False)
+
+    door = db.relationship('Door')
+
+class AmenityBooking(db.Model):
+    __tablename__ = 'amenity_bookings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    amenity_id = db.Column(db.Integer, db.ForeignKey('amenities.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    starts_at = db.Column(db.DateTime, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    cancelled_at = db.Column(db.DateTime, nullable=True)
+
+    amenity = db.relationship('Amenity')
+    user = db.relationship('User')
+
+    @property
+    def ends_at(self):
+        return self.starts_at + timedelta(hours=1)
+
+    @property
+    def door_open(self):
+        return self.starts_at - timedelta(minutes=10) <= datetime.now() < self.ends_at
+
+def active_booking(user, door):
+    now = datetime.now()
+    return AmenityBooking.query.join(Amenity).filter(Amenity.door_id == door.id, AmenityBooking.user_id == user.id,
+                                                     AmenityBooking.cancelled_at.is_(None),
+                                                     AmenityBooking.starts_at <= now + timedelta(minutes=10),
+                                                     AmenityBooking.starts_at > now - timedelta(hours=1)).first()
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'

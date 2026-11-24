@@ -151,7 +151,7 @@
             log(`${label} unlocked`, 'success');
         } else {
             setStatus(statusId, 'Denied', 'danger');
-            log(`${label} denied: ${data.error || 'Unknown error'}`, 'danger');
+            log(`${label} denied: ${data.reason || data.error || 'Unknown error'}`, 'danger');
         }
     }
 

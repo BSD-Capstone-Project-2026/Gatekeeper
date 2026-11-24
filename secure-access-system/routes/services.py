@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
 
-from models import db, Announcement, AnnouncementRead, MaintenanceRequest, User
+from models import db, Amenity, AmenityBooking, Announcement, AnnouncementRead, MaintenanceRequest, User
 from routes.decorators import role_required
 from routes.web import login_required
 from routes.visitors import STAFF, current_user
@@ -13,6 +13,7 @@ services_bp = Blueprint("services", __name__, url_prefix="/services")
 
 MAINTENANCE_CATEGORIES = ("Plumbing", "Electrical", "Heating and cooling", "Appliance", "Other")
 MAINTENANCE_STATUSES = ("Open", "In Progress", "Completed")
+BOOKING_DAYS = 7
 
 
 def resident_floors():
@@ -120,3 +121,81 @@ def update_maintenance(request_id):
         notify(item.resident, f"Maintenance request {new_status.lower()}",
                f"Your {item.category.lower()} request \"{item.description[:60]}\" is now {new_status}.")
     return redirect(url_for("services.maintenance"))
+
+
+def bookable_amenities(user):
+    amenities = Amenity.query.order_by(Amenity.name).all()
+    if user.role != 'resident':
+        return amenities
+    zone_ids = {z.id for z in user.zones}
+    return [a for a in amenities if not (a.door and a.door.zone_id) or a.door.zone_id in zone_ids]
+
+
+def live_bookings(query):
+    return query.filter(AmenityBooking.cancelled_at.is_(None))
+
+
+@services_bp.route("/amenities")
+@login_required
+@role_required('resident', *STAFF)
+def amenities(error=None, status=200):
+    user = current_user()
+    now = datetime.now()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if user.role in STAFF:
+        todays = live_bookings(AmenityBooking.query).filter(AmenityBooking.starts_at >= today, AmenityBooking.starts_at < today + timedelta(days=1))
+        return render_template("services/amenities_staff.html", bookings=todays.order_by(AmenityBooking.starts_at).all(),
+                               amenities=Amenity.query.order_by(Amenity.name).all())
+    choices = bookable_amenities(user)
+    amenity = next((a for a in choices if a.id == request.values.get("amenity", type=int)), choices[0] if choices else None)
+    days = [today + timedelta(days=i) for i in range(BOOKING_DAYS)]
+    try:
+        day = datetime.strptime(request.values.get("day", ""), "%Y-%m-%d")
+    except ValueError:
+        day = today
+    day = day if day in days else today
+    slots = []
+    if amenity:
+        starts = [day + timedelta(hours=h) for h in range(amenity.opens_hour, amenity.closes_hour)]
+        taken = live_bookings(AmenityBooking.query).filter(AmenityBooking.amenity_id == amenity.id, AmenityBooking.starts_at.in_(starts)).all()
+        slots = [{"start": start, "booked": sum(b.starts_at == start for b in taken), "mine": any(b.starts_at == start and b.user_id == user.id for b in taken),
+                  "past": start + timedelta(hours=1) <= now} for start in starts]
+    mine = live_bookings(AmenityBooking.query).filter(AmenityBooking.user_id == user.id, AmenityBooking.starts_at > now - timedelta(hours=1))
+    return render_template("services/amenities.html", choices=choices, amenity=amenity, days=days, day=day, slots=slots, now=now,
+                           bookings=mine.order_by(AmenityBooking.starts_at).all(), error=error), status
+
+
+@services_bp.route("/amenities/book", methods=["POST"])
+@login_required
+@role_required('resident')
+def book_amenity():
+    user = current_user()
+    amenity = next((a for a in bookable_amenities(user) if a.id == request.form.get("amenity", type=int)), None)
+    try:
+        start = datetime.strptime(request.form.get("start", ""), "%Y-%m-%dT%H:%M")
+    except ValueError:
+        start = None
+    now = datetime.now()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if not amenity or not start or start.minute or not amenity.opens_hour <= start.hour < amenity.closes_hour             or start + timedelta(hours=1) <= now or start >= today + timedelta(days=BOOKING_DAYS):
+        return amenities(error="Choose an open slot within the next week.", status=400)
+    if live_bookings(AmenityBooking.query).filter_by(amenity_id=amenity.id, starts_at=start).count() >= amenity.capacity:
+        return amenities(error=f"This {amenity.name.lower()} slot is full.", status=400)
+    if live_bookings(AmenityBooking.query).filter_by(user_id=user.id, starts_at=start).first():
+        return amenities(error="You already have a booking at this time.", status=400)
+    db.session.add(AmenityBooking(amenity_id=amenity.id, user_id=user.id, starts_at=start))
+    db.session.commit()
+    return redirect(url_for("services.amenities", amenity=amenity.id, day=start.strftime("%Y-%m-%d")))
+
+
+@services_bp.route("/amenities/bookings/<int:booking_id>/cancel", methods=["POST"])
+@login_required
+@role_required('resident')
+def cancel_booking(booking_id):
+    booking = AmenityBooking.query.get_or_404(booking_id)
+    if booking.user_id != session['user_id']:
+        abort(404)
+    if not booking.cancelled_at and booking.starts_at > datetime.now():
+        booking.cancelled_at = datetime.utcnow()
+        db.session.commit()
+    return redirect(url_for("services.amenities", amenity=booking.amenity_id))
